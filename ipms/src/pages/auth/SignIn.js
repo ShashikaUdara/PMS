@@ -28,8 +28,17 @@ const SignIn = () => {
     setError('');
 
     try {
-      await authService.signIn(formData);
-      navigate('/dashboard');
+      const response = await authService.signIn(formData);
+      if (response && response.code === 200) {
+        console.log(response.data.token)
+        if (response.data.token) {
+          localStorage.setItem('token', response.data.token);
+          localStorage.setItem('user', JSON.stringify(response.data.user));
+        }
+        navigate('/dashboard');
+      } else{
+        setError(response.message || 'Failed to sign in. Please try again.');
+      }
     } catch (err) {
       setError(err.message || 'Failed to sign in. Please try again.');
     } finally {

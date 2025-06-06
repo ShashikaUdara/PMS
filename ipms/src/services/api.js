@@ -52,6 +52,27 @@ export const authService = {
   },
 
   signOut: () => {
+    const token = localStorage.getItem('token');
+    const user = localStorage.getItem('user');
+    let userId = null;
+    try {
+      userId = user ? JSON.parse(user).id : null;
+    } catch (e) {
+      userId = null;
+    }
+    if (token && userId) {
+      api.post(
+      '/user/signout',
+      { userId },
+      {
+        headers: {
+        Authorization: `Bearer ${token}`,
+        },
+      }
+      ).catch(() => {});
+    } else {
+      api.post('/user/signout').catch(() => {});
+    }
     localStorage.removeItem('token');
     localStorage.removeItem('user');
   },

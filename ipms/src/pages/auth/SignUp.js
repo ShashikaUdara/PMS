@@ -9,13 +9,13 @@ const SignUp = () => {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
+    first_name: '',
+    last_name: '',
     email: '',
     password: '',
-    companyName: '',
-    position: '',
-    phoneNumber: '',
+    company: '',
+    role: '',
+    phone: '',
   });
 
   const handleChange = (e) => {
@@ -33,8 +33,14 @@ const SignUp = () => {
     setError('');
 
     try {
-      await authService.signUp(formData);
-      navigate('/dashboard');
+      const response = await authService.signUp(formData);
+      if (response && response.code === 201) {
+        console.log(response)
+        navigate('/signin');
+      } else{
+        setError(response.message || 'Failed to sign up. Please try again.');
+      }
+      
     } catch (err) {
       setError(err.message || 'Failed to sign up. Please try again.');
     } finally {
@@ -67,8 +73,8 @@ const SignUp = () => {
                 </span>
                 <Form.Control
                   type="text"
-                  name="firstName"
-                  value={formData.firstName}
+                  name="first_name"
+                  value={formData.first_name}
                   onChange={handleChange}
                   required
                   placeholder="Enter first name"
@@ -85,8 +91,8 @@ const SignUp = () => {
                 </span>
                 <Form.Control
                   type="text"
-                  name="lastName"
-                  value={formData.lastName}
+                  name="last_name"
+                  value={formData.last_name}
                   onChange={handleChange}
                   required
                   placeholder="Enter last name"
@@ -140,15 +146,15 @@ const SignUp = () => {
         </Form.Group>
 
         <Form.Group className="mb-3">
-          <Form.Label>Company Name</Form.Label>
+          <Form.Label>Company</Form.Label>
           <div className="input-group">
             <span className="input-group-text">
               <i className="bi bi-building"></i>
             </span>
             <Form.Control
               type="text"
-              name="companyName"
-              value={formData.companyName}
+              name="company"
+              value={formData.company}
               onChange={handleChange}
               required
               placeholder="Enter company name"
@@ -159,15 +165,15 @@ const SignUp = () => {
         <Row>
           <Col sm={6}>
             <Form.Group className="mb-3">
-              <Form.Label>Position</Form.Label>
+              <Form.Label>Role</Form.Label>
               <div className="input-group">
                 <span className="input-group-text">
                   <i className="bi bi-briefcase"></i>
                 </span>
                 <Form.Control
                   type="text"
-                  name="position"
-                  value={formData.position}
+                  name="role"
+                  value={formData.role}
                   onChange={handleChange}
                   required
                   placeholder="Enter your position"
@@ -177,15 +183,15 @@ const SignUp = () => {
           </Col>
           <Col sm={6}>
             <Form.Group className="mb-3">
-              <Form.Label>Phone Number</Form.Label>
+              <Form.Label>Phone</Form.Label>
               <div className="input-group">
                 <span className="input-group-text">
                   <i className="bi bi-telephone"></i>
                 </span>
                 <Form.Control
                   type="tel"
-                  name="phoneNumber"
-                  value={formData.phoneNumber}
+                  name="phone"
+                  value={formData.phone}
                   onChange={handleChange}
                   required
                   placeholder="Enter phone number"
