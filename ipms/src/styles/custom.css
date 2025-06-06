@@ -1,0 +1,234 @@
+/* Custom Bootstrap Theme Styles */
+
+:root {
+  --primary: #1a237e;
+  --primary-light: #64b5f6;
+  --secondary: #1e2a38;
+  --dark: #0a1929;
+  --light: #f8fafc;
+}
+
+body {
+  background-color: var(--light);
+  font-family: 'Inter', 'Roboto', 'Helvetica', 'Arial', sans-serif;
+}
+
+/* Auth Pages */
+.max-width-400 {
+  max-width: 400px;
+}
+
+.max-width-500 {
+  max-width: 500px;
+}
+
+/* Dashboard */
+.width-240 {
+  width: 240px;
+}
+
+.width-72 {
+  width: 72px;
+}
+
+/* Custom Button Styles */
+.btn-primary {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+.btn-primary:hover {
+  background-color: #283593;
+  border-color: #283593;
+}
+
+/* Custom Input Styles */
+.form-control:focus {
+  border-color: var(--primary-light);
+  box-shadow: 0 0 0 0.2rem rgba(100, 181, 246, 0.25);
+}
+
+/* Custom Card Styles */
+.card {
+  border-radius: 1rem;
+  border: none;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Navbar Styles */
+.navbar {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Sidebar Styles */
+.nav-link {
+  color: rgba(255, 255, 255, 0.8);
+  transition: all 0.3s ease;
+}
+
+.nav-link:hover,
+.nav-link.active {
+  color: #fff;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Progress Bar Styles */
+.progress {
+  height: 8px;
+  border-radius: 4px;
+}
+
+.progress-bar {
+  background: linear-gradient(90deg, var(--primary) 0%, var(--primary-light) 100%);
+}
+
+/* Alert Styles */
+.alert {
+  border-radius: 0.5rem;
+}
+
+/* Animation Classes */
+.fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Utility Classes */
+.bg-gradient-primary {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+}
+
+.text-gradient-primary {
+  background: linear-gradient(45deg, var(--primary) 30%, var(--primary-light) 90%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.shadow-hover {
+  transition: all 0.3s ease;
+}
+
+.shadow-hover:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Custom progress bar */
+.custom-progress {
+  height: 0.5rem;
+  border-radius: 1rem;
+}
+
+/* Remove dropdown toggle arrow */
+.btn-no-arrow::after {
+  display: none;
+}
+
+/* Card footer border removal */
+.card-footer.bg-transparent.border-top-0 {
+  padding-top: 0;
+}
+
+/* Dashboard Animations */
+.slide-up {
+  animation: slideUp 0.4s ease-out;
+}
+
+.slide-in {
+  animation: slideIn 0.4s ease-out;
+}
+
+.scale-in {
+  animation: scaleIn 0.3s ease-out;
+}
+
+.fade-slide-in {
+  animation: fadeSlideIn 0.4s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Progress bar animation */
+.progress-bar {
+  transition: width 0.6s ease-in-out;
+}
+
+/* Table row hover animation */
+.table-hover tbody tr {
+  transition: all 0.2s ease;
+}
+
+.table-hover tbody tr:hover {
+  transform: scale(1.01);
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* Button hover animation */
+.btn {
+  transition: all 0.2s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+/* Badge animation */
+.badge {
+  transition: all 0.2s ease;
+}
+
+.badge:hover {
+  transform: scale(1.1);
+} 
