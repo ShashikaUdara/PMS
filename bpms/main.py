@@ -1,164 +1,277 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, EmailStr
-from typing import Optional
+from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
-import hashlib
-from repository import get_session, User, UserSession
-from models import UserSignup, GeneralResponse, UserSignin
-import uuid
+from fastapi.security import OAuth2PasswordBearer
+from typing import List
+import os
+from repository import get_session, insert_project_activity, User, UserSession, Project, Team, ProjectBoq, ProjectActivity, Tag
+from models import (
+    UserSignup, GeneralResponse, UserSignin, Token, UserResponse,
+    ProjectCreate, ProjectResponse
+)
+from auth import get_password_hash, verify_password, get_current_user, create_user_token
+from fastapi_limiter import FastAPILimiter
+from fastapi_limiter.depends import RateLimiter
+import redis.asyncio as redis
 import datetime
+from dotenv import load_dotenv
+from sqlalchemy.exc import IntegrityError
 from fastapi import APIRouter
-from fastapi import Request
-import inspect
-from auth import validate_token
 
-app = FastAPI()
+load_dotenv()
 
+app = FastAPI(title="Project Management System API")
 router = APIRouter(prefix="/api/v1")
+
+# Configure CORS
+origins = [
+    "http://localhost:3001",  # React frontend
+    "http://localhost:8080",  # Vue frontend
+    # Add your production domains here
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust this in production!
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@router.post("/user/signup")
-async def signup(user: UserSignup):
+# Setup Redis for rate limiting
+@app.on_event("startup")
+async def startup():
+    redis_host = os.getenv("REDIS_HOST", "localhost")
+    redis_port = int(os.getenv("REDIS_PORT", 6379))
+    redis_url = f"redis://{redis_host}:{redis_port}"
+    redis_instance = redis.from_url(redis_url, encoding="utf-8", decode_responses=True)
+    await FastAPILimiter.init(redis_instance)
 
+@router.post("/user/signup", response_model=GeneralResponse, dependencies=[Depends(RateLimiter(times=5, seconds=60))])
+async def signup(user: UserSignup):
     session = get_session()
     existing_user = session.query(User).filter_by(email=user.email, status=1).first()
     if existing_user:
-        return GeneralResponse(
-            message="User with this email already exists and is active.", 
-            status=False,
-            code=400,
-            data=[]
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User with this email already exists and is active."
         )
 
-    hashed_password = hashlib.sha256(user.password.encode('utf-8')).hexdigest()
-
+    hashed_password = get_password_hash(user.password)
     new_user = User(
         first_name=user.first_name,
         last_name=user.last_name,
-        bio='',
+        bio=user.bio or '',
         hashed_password=hashed_password,
         email=user.email,
         status=1,
         role=1,
-        company=123
+        company=1
     )
     session.add(new_user)
     session.commit()
+    session.refresh(new_user)
     
     return GeneralResponse(
         message="User signed up successfully",
         status=True,
-        code=201,
-        data=[{"user": user}]
+        code=status.HTTP_201_CREATED,
+        data=UserResponse.from_orm(new_user)
     )
 
-@router.post("/user/signin")
+@router.post("/user/signin", response_model=GeneralResponse, dependencies=[Depends(RateLimiter(times=5, seconds=60))])
 async def signin(user: UserSignin):
     session = get_session()
     db_user = session.query(User).filter_by(email=user.email, status=1).first()
-    if not db_user:
-        return GeneralResponse(
-            message="Invalid email or password.",
-            status=False,
-            code=401,
-            data=[]
+    if not db_user or not verify_password(user.password, db_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password"
         )
 
-    hashed_password = hashlib.sha256(user.password.encode('utf-8')).hexdigest()
-    if db_user.hashed_password != hashed_password:
-        return GeneralResponse(
-            message="Invalid email or password.",
-            status=False,
-            code=401,
-            data=[]
-        )
-
-
-    session_token = str(uuid.uuid4())
-    now = datetime.datetime.utcnow()
-    user_session = UserSession(
-        user_id=db_user.id,
-        session_token=session_token,
-        status=1,
-        created_at=now,
-        expires_at=now + datetime.timedelta(hours=24)
-    )
-    session.add(user_session)
-    session.commit()
-
+    token = create_user_token(db_user.id)
+    
     return GeneralResponse(
-        message="Signin successful.",
+        message="Signin successful",
         status=True,
-        code=200,
-        data={"token": session_token, "user": {
-            "id": db_user.id,
-            "first_name": db_user.first_name,
-            "last_name": db_user.last_name,
-            "email": db_user.email,
-            "bio": db_user.bio,
-            "role": db_user.role,
-            "company": db_user.company,
-            "status": db_user.status
-        }}
+        code=status.HTTP_200_OK,
+        data={
+            "token": token,
+            "user": UserResponse.from_orm(db_user)
+        }
     )
 
 @router.post("/user/signout")
-async def signout():
-    frame = inspect.currentframe()
-    while frame:
-        if "request" in frame.f_locals:
-            request = frame.f_locals["request"]
-            break
-        frame = frame.f_back
-    else:
-        request = None
-
-    auth_header = None
-    if request:
-        auth_header = request.headers.get("authorization")
-        print(f"Authorization header: {auth_header}")
-    else:
-        return GeneralResponse(
-            message="Invalid token.",
-            status=False,
-            code=401,
-            data=[]
-        )
-    
-    if auth_header is None:
-        return GeneralResponse(
-            message="Header has no token.",
-            status=False,
-            code=401,
-            data=[]
-        )
-    
+async def signout(current_user: User = Depends(get_current_user)):
     session = get_session()
-    user_session = session.query(UserSession).filter_by(session_token=auth_header[len("Bearer "):], status=1).first()
-    if not user_session:
-        return GeneralResponse(
-            message="Invalid or expired session token.",
-            status=False,
-            code=401,
-            data=[]
-        )
+    user_sessions = session.query(UserSession).filter_by(
+        user_id=current_user.id,
+        status=1
+    ).all()
     
-    # user_session_info = validate_token(request, user_session.session_token)
-
-    user_session.status = 0  # Mark session as inactive
+    for user_session in user_sessions:
+        user_session.status = 0
+    
     session.commit()
     return GeneralResponse(
-        message="Signout successful.",
+        message="Signout successful",
         status=True,
-        code=200,
+        code=status.HTTP_200_OK,
         data=[]
     )
+
+@router.get("/user/me", response_model=GeneralResponse)
+async def get_current_user_info(current_user: User = Depends(get_current_user)):
+    return GeneralResponse(
+        message="User information retrieved successfully",
+        status=True,
+        code=status.HTTP_200_OK,
+        data=UserResponse.from_orm(current_user)
+    )
+
+@router.post("/project/create", response_model=GeneralResponse, dependencies=[Depends(RateLimiter(times=10, seconds=60))])
+async def create_project(
+    project: ProjectCreate,
+    current_user: User = Depends(get_current_user)
+):
+    session = get_session()
+
+    # Verify that the user has access to the team
+    if project.team_id:
+        team = session.query(Team).filter(
+            Team.id == project.team_id,
+            Team.company_id == current_user.company,
+            Team.status == 1
+        ).first()
+        if not team:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Team not found or you don't have access to it"
+            )
+
+    # Verify BOQ exists and belongs to the company
+    if project.boq_id:
+        boq = session.query(ProjectBoq).filter(
+            ProjectBoq.id == project.boq_id,
+            ProjectBoq.company_id == current_user.company,
+            ProjectBoq.status == 1
+        ).first()
+        if not boq:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="BOQ not found or you don't have access to it"
+            )
+
+    try:
+        latest_project = session.query(Project).order_by(Project.project_index.desc()).first()
+        new_project_index = 1 if not latest_project else latest_project.project_index + 1
+
+        print(f"Creating project with index: {new_project_index}, name: {project.name}")
+
+        new_project = Project(
+            project_index=new_project_index,
+            name=project.name,
+            description=project.description,
+            status=1,
+            created_by=current_user.id,
+            updated_by=current_user.id
+        )
+        session.add(new_project)
+        session.commit()
+        session.refresh(new_project)
+
+        print(f"Project created with ID: {new_project.id}")
+
+        activity_id = insert_project_activity(new_project.id, current_user)
+        print(f"Activity created with ID: {activity_id}")
+        
+        return GeneralResponse(
+            message="Project created successfully",
+            status=True,
+            code=status.HTTP_201_CREATED,
+            data=ProjectResponse.from_orm(new_project)
+        )
+    except IntegrityError as e:
+        session.rollback()
+        print(f"IntegrityError while creating project: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Error creating project. Please check if all referenced entities exist."
+        )
+    except Exception as e:
+        session.rollback()
+        print(f"Unexpected error while creating project: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while creating the project: {str(e)}"
+        )
+
+@router.get("/projects/list/{userId}", response_model=GeneralResponse)
+async def get_project_list(
+    userId: int, 
+    page: int = 1, 
+    limit: int = 10, 
+    current_user: User = Depends(get_current_user)
+):
+    session = get_session()
+
+    # Security check: Users can only view their own projects unless they are admins
+    if userId != current_user.id and current_user.role != 1:  # Assuming role 1 is admin
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only view your own projects"
+        )
+
+    # Verify if the user exists
+    user = session.query(User).filter(User.id == userId, User.status == 1).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    try:
+        # Calculate offset
+        offset = (page - 1) * limit
+
+        # Get total count of projects
+        total_projects = session.query(Project).filter(
+            Project.created_by == userId,
+            Project.status == 1
+        ).count()
+
+        # Get paginated projects
+        projects = session.query(Project).filter(
+            Project.created_by == userId,
+            Project.status == 1
+        ).order_by(Project.created_at.desc()).offset(offset).limit(limit).all()
+        
+        # Transform projects to response model
+        project_list = [ProjectResponse.from_orm(project) for project in projects]
+
+        # Calculate total pages
+        total_pages = (total_projects + limit - 1) // limit
+
+        return GeneralResponse(
+            message="Project list retrieved successfully",
+            status=True,
+            code=status.HTTP_200_OK,
+            data={
+                "projects": project_list,
+                "pagination": {
+                    "current_page": page,
+                    "total_pages": total_pages,
+                    "total_items": total_projects,
+                    "items_per_page": limit
+                }
+            }
+        )
+    except Exception as e:
+        print(f"Error fetching projects: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while fetching projects"
+        )
+    finally:
+        session.close()
 
 app.include_router(router)

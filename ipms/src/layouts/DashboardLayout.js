@@ -5,6 +5,7 @@ import UserMenu from '../components/UserMenu';
 
 const menuItems = [
   { text: 'Dashboard', icon: 'bi-speedometer2', path: '/dashboard' },
+  { text: 'Projects', icon: 'bi-folder', path: '/projects' },
   { text: 'Project Stages', icon: 'bi-building-gear', path: '/project-stages' },
   { text: 'Activities', icon: 'bi-graph-up', path: '/stage-activities' },
 ];

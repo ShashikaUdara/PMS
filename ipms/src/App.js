@@ -5,6 +5,8 @@ import SignIn from './pages/auth/SignIn';
 import SignUp from './pages/auth/SignUp';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
+import Projects from './pages/Projects';
+import Project from './pages/Project';
 import ProjectStages from './pages/ProjectStages';
 import StageActivities from './pages/StageActivities';
 import SubActivities from './pages/SubActivities';
@@ -21,6 +23,8 @@ function App() {
         <Route element={<DashboardLayout />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/projects" element={<Projects />} />
+          <Route path="/project/:projectId" element={<Project />} />
           <Route path="/project-stages" element={<ProjectStages />} />
           <Route path="/stage-activities/:stageId" element={<StageActivities />} />
           <Route path="/sub-activities/:activityId" element={<SubActivities />} />

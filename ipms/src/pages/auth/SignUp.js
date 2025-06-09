@@ -8,14 +8,13 @@ const SignUp = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
     email: '',
     password: '',
-    company: '',
-    role: '',
-    phone: '',
+    confirm_password: '',
   });
 
   const handleChange = (e) => {
@@ -32,12 +31,20 @@ const SignUp = () => {
     setLoading(true);
     setError('');
 
+    if (formData.password !== formData.confirm_password) {
+      setError('Passwords do not match');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const response = await authService.signUp(formData);
+      // Remove confirm_password before sending to API
+      const { confirm_password, ...submitData } = formData;
+      const response = await authService.signUp(submitData);
       if (response && response.code === 201) {
         console.log(response)
         navigate('/signin');
-      } else{
+      } else {
         setError(response.message || 'Failed to sign up. Please try again.');
       }
       
@@ -145,61 +152,28 @@ const SignUp = () => {
           </Form.Text>
         </Form.Group>
 
-        <Form.Group className="mb-3">
-          <Form.Label>Company</Form.Label>
+        <Form.Group className="mb-4">
+          <Form.Label>Confirm Password</Form.Label>
           <div className="input-group">
             <span className="input-group-text">
-              <i className="bi bi-building"></i>
+              <i className="bi bi-lock"></i>
             </span>
             <Form.Control
-              type="text"
-              name="company"
-              value={formData.company}
+              type={showConfirmPassword ? 'text' : 'password'}
+              name="confirm_password"
+              value={formData.confirm_password}
               onChange={handleChange}
               required
-              placeholder="Enter company name"
+              placeholder="Confirm your password"
             />
+            <Button 
+              variant="outline-secondary"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+            >
+              <i className={`bi bi-eye${showConfirmPassword ? '-slash' : ''}`}></i>
+            </Button>
           </div>
         </Form.Group>
-
-        <Row>
-          <Col sm={6}>
-            <Form.Group className="mb-3">
-              <Form.Label>Role</Form.Label>
-              <div className="input-group">
-                <span className="input-group-text">
-                  <i className="bi bi-briefcase"></i>
-                </span>
-                <Form.Control
-                  type="text"
-                  name="role"
-                  value={formData.role}
-                  onChange={handleChange}
-                  required
-                  placeholder="Enter your position"
-                />
-              </div>
-            </Form.Group>
-          </Col>
-          <Col sm={6}>
-            <Form.Group className="mb-3">
-              <Form.Label>Phone</Form.Label>
-              <div className="input-group">
-                <span className="input-group-text">
-                  <i className="bi bi-telephone"></i>
-                </span>
-                <Form.Control
-                  type="tel"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  required
-                  placeholder="Enter phone number"
-                />
-              </div>
-            </Form.Group>
-          </Col>
-        </Row>
 
         <Button
           type="submit"
@@ -210,7 +184,7 @@ const SignUp = () => {
           {loading ? (
             <Spinner animation="border" size="sm" />
           ) : (
-            'Create Account'
+            'Sign Up'
           )}
         </Button>
 

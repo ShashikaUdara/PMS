@@ -14,7 +14,8 @@ api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      const parsedToken = JSON.parse(token).access_token;
+      config.headers.Authorization = `Bearer ${parsedToken}`;
     }
     return config;
   },
@@ -52,16 +53,17 @@ export const authService = {
   },
 
   signOut: () => {
-    const token = localStorage.getItem('token');
     const user = localStorage.getItem('user');
     let userId = null;
+    let token = JSON.parse(localStorage.getItem('token')).access_token;
     try {
       userId = user ? JSON.parse(user).id : null;
     } catch (e) {
       userId = null;
     }
+    let response = null;
     if (token && userId) {
-      api.post(
+      response = api.post(
       '/user/signout',
       { userId },
       {
@@ -71,15 +73,48 @@ export const authService = {
       }
       ).catch(() => {});
     } else {
-      api.post('/user/signout').catch(() => {});
+      response = api.post('/user/signout').catch(() => {});
     }
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+
+    if (response) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    }
   },
 
   getCurrentUser: () => {
     const user = localStorage.getItem('user');
     return user ? JSON.parse(user) : null;
+  },
+};
+
+// Project services
+export const projectService = {
+  createProject: async (projectData) => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      const userId = user?.id;
+      if (!userId) {
+        throw new Error('User not found');
+      }
+      const response = await api.post('/project/create', { ...projectData, userId });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'An error occurred while creating the project' };
+    }
+  },
+  getProjects: async (page = 1, limit = 10) => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      const userId = user?.id;
+      if (!userId) {
+        throw new Error('User not found');
+      }
+      const response = await api.get(`/projects/list/${userId}?page=${page}&limit=${limit}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'An error occurred while fetching projects' };
+    }
   },
 };
 

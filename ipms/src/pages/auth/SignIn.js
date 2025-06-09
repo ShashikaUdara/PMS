@@ -30,9 +30,8 @@ const SignIn = () => {
     try {
       const response = await authService.signIn(formData);
       if (response && response.code === 200) {
-        console.log(response.data.token)
         if (response.data.token) {
-          localStorage.setItem('token', response.data.token);
+          localStorage.setItem('token', JSON.stringify(response.data.token));
           localStorage.setItem('user', JSON.stringify(response.data.user));
         }
         navigate('/dashboard');
