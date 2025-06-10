@@ -103,14 +103,31 @@ export const projectService = {
       throw error.response?.data || { message: 'An error occurred while creating the project' };
     }
   },
-  getProjects: async (page = 1, limit = 10) => {
+  getProjects: async (page = 1, limit = 10, search = '', status = '', sortField = '', sortDirection = '') => {
     try {
       const user = JSON.parse(localStorage.getItem('user'));
       const userId = user?.id;
       if (!userId) {
         throw new Error('User not found');
       }
-      const response = await api.get(`/projects/list/${userId}?page=${page}&limit=${limit}`);
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+        userId: userId.toString()
+      });
+
+      if (search) {
+        queryParams.append('search', search);
+      }
+      if (status && status !== 'all') {
+        queryParams.append('status', status);
+      }
+      if (sortField && sortDirection) {
+        queryParams.append('sortField', sortField);
+        queryParams.append('sortDirection', sortDirection);
+      }
+
+      const response = await api.get(`/projects/list?${queryParams.toString()}`);
       return response.data;
     } catch (error) {
       throw error.response?.data || { message: 'An error occurred while fetching projects' };

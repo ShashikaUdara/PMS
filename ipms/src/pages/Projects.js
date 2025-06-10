@@ -22,8 +22,6 @@ const Projects = () => {
   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortField, setSortField] = useState('lastUpdated');
-  const [sortDirection, setSortDirection] = useState('desc');
   const [statusFilter, setStatusFilter] = useState('all');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -39,10 +37,35 @@ const Projects = () => {
   const [pageSize, setPageSize] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
 
+  // Sorting states
+  const [sortField, setSortField] = useState('project_index');
+  const [sortDirection, setSortDirection] = useState('desc');
+
+  // Debounce search term to avoid too many API calls
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      fetchProjects();
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm]);
+
+  // Fetch when filters, sorting, or pagination changes
+  useEffect(() => {
+    fetchProjects();
+  }, [statusFilter, currentPage, pageSize, sortField, sortDirection]);
+
   const fetchProjects = async () => {
     setLoading(true);
     try {
-      const response = await projectService.getProjects(currentPage, pageSize);
+      const response = await projectService.getProjects(
+        currentPage,
+        pageSize,
+        searchTerm,
+        statusFilter,
+        sortField,
+        sortDirection
+      );
       if (response && response.data) {
         setProjects(response.data.projects || []);
         if (response.data.pagination) {
@@ -59,9 +82,17 @@ const Projects = () => {
     }
   };
 
-  useEffect(() => {
-    fetchProjects();
-  }, [currentPage, pageSize]); // It's okay to exclude fetchProjects as it doesn't depend on any props or state
+  // Handle search input change
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1); // Reset to first page when searching
+  };
+
+  // Handle status filter change
+  const handleStatusChange = (e) => {
+    setStatusFilter(e.target.value);
+    setCurrentPage(1); // Reset to first page when changing filter
+  };
 
   // Handle page size change
   const handlePageSizeChange = (newSize) => {
@@ -248,20 +279,20 @@ const Projects = () => {
                   type="text"
                   placeholder="Search projects..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={handleSearchChange}
                 />
               </InputGroup>
             </Col>
             <Col md={6} lg={4}>
               <Form.Select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={handleStatusChange}
               >
                 <option value="all">All Status</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Completed">Completed</option>
-                <option value="Delayed">Delayed</option>
-                <option value="On Hold">On Hold</option>
+                <option value="1">Active</option>
+                <option value="2">Completed</option>
+                <option value="3">On Hold</option>
+                <option value="4">Cancelled</option>
               </Form.Select>
             </Col>
             <Col md={6} lg={4}>

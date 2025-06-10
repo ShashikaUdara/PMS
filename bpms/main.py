@@ -24,7 +24,7 @@ router = APIRouter(prefix="/api/v1")
 
 # Configure CORS
 origins = [
-    "http://localhost:3001",  # React frontend
+    "http://localhost:3000",  # React frontend
     "http://localhost:8080",  # Vue frontend
     # Add your production domains here
 ]
@@ -205,11 +205,13 @@ async def create_project(
             detail=f"An error occurred while creating the project: {str(e)}"
         )
 
-@router.get("/projects/list/{userId}", response_model=GeneralResponse)
+@router.get("/projects/list", response_model=GeneralResponse)
 async def get_project_list(
     userId: int, 
     page: int = 1, 
-    limit: int = 10, 
+    limit: int = 10,
+    sortField: str = "created_at",
+    sortDirection: str = "desc",
     current_user: User = Depends(get_current_user)
 ):
     session = get_session()
@@ -228,6 +230,8 @@ async def get_project_list(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
+    
+    print("reached here")
 
     try:
         # Calculate offset
@@ -239,11 +243,26 @@ async def get_project_list(
             Project.status == 1
         ).count()
 
-        # Get paginated projects
-        projects = session.query(Project).filter(
+        # Build the query with dynamic sorting
+        query = session.query(Project).filter(
             Project.created_by == userId,
             Project.status == 1
-        ).order_by(Project.created_at.desc()).offset(offset).limit(limit).all()
+        )
+
+        # Get the sort column
+        if hasattr(Project, sortField):
+            sort_column = getattr(Project, sortField)
+            if sortDirection.lower() == "desc":
+                sort_column = sort_column.desc()
+            else:
+                sort_column = sort_column.asc()
+            query = query.order_by(sort_column)
+        else:
+            # Fallback to default sorting if invalid field
+            query = query.order_by(Project.created_at.desc())
+
+        # Get paginated and sorted projects
+        projects = query.offset(offset).limit(limit).all()
         
         # Transform projects to response model
         project_list = [ProjectResponse.from_orm(project) for project in projects]
