@@ -152,6 +152,21 @@ export const projectService = {
       throw error.response?.data || { message: 'An error occurred while fetching project details' };
     }
   },
+  updateProject: async (projectId, projectData) => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      const userId = user?.id;
+      if (!userId) {
+        throw new Error('User not found');
+      }
+      const response = await api.post(`/project/${projectId}/update`, { 
+        ...projectData,
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'An error occurred while updating the project' };
+    }
+  },
 };
 
 export default api; 

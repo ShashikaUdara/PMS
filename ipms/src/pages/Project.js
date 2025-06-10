@@ -13,6 +13,7 @@ import {
   Nav
 } from 'react-bootstrap';
 import { projectService } from '../services/api';
+import EditProjectModal from '../components/EditProjectModal';
 
 // Custom styles for improved visibility
 const styles = {
@@ -97,6 +98,7 @@ const Project = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('tasks');
+  const [showEditModal, setShowEditModal] = useState(false);
 
   const fetchProjectDetail = useCallback(async () => {
     try {
@@ -156,6 +158,10 @@ const Project = () => {
     });
   };
 
+  const handleProjectUpdated = useCallback(async () => {
+    await fetchProjectDetail();
+  }, [fetchProjectDetail]);
+
   if (loading) {
     return (
       <Container fluid className="py-5" style={styles.container}>
@@ -206,6 +212,13 @@ const Project = () => {
 
   return (
     <Container fluid style={styles.container} className="py-4">
+      <EditProjectModal
+        show={showEditModal}
+        onHide={() => setShowEditModal(false)}
+        project={project}
+        onProjectUpdated={handleProjectUpdated}
+      />
+      
       {/* Header */}
       <Card style={{ ...styles.card, ...styles.headerCard }}>
         <Card.Body className="py-3">
@@ -233,6 +246,7 @@ const Project = () => {
                 variant="primary" 
                 size="sm"
                 className="d-flex align-items-center"
+                onClick={() => setShowEditModal(true)}
               >
                 <i className="bi bi-pencil me-2"></i>
                 Edit Project

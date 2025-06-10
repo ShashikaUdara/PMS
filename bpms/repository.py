@@ -207,6 +207,36 @@ class Project(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     updated_by = Column(Integer, ForeignKey(f'{SCHEMA_NAME}.users.id'), nullable=False)
 
+class ProjectTask(Base):
+    __tablename__ = 'project_tasks'
+    __table_args__ = (
+        Index('idx_project_task_project_id', 'project_id'),
+        Index('idx_project_task_status', 'status'),
+        Index('idx_project_task_assigned_to', 'assigned_to'),
+        Index('idx_project_task_due_date', 'due_date'),
+        UniqueConstraint('task_index', name='uq_task_index'),
+        {'schema': SCHEMA_NAME},
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    task_index = Column(Integer, nullable=False)
+    project_id = Column(Integer, ForeignKey(f'{SCHEMA_NAME}.projects.id'), nullable=False)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    priority = Column(SmallInteger, nullable=False, default=1)  # 1=Low, 2=Medium, 3=High
+    status = Column(SmallInteger, nullable=False, default=1)    # 1=Todo, 2=InProgress, 3=Done, 4=Blocked
+    assigned_to = Column(Integer, ForeignKey(f'{SCHEMA_NAME}.users.id'), nullable=True)
+    estimated_hours = Column(Integer, nullable=True)
+    actual_hours = Column(Integer, nullable=True)
+    start_date = Column(DateTime, nullable=True)
+    due_date = Column(DateTime, nullable=True)
+    completed_date = Column(DateTime, nullable=True)
+    parent_task_id = Column(Integer, ForeignKey(f'{SCHEMA_NAME}.project_tasks.id'), nullable=True)  # For subtasks
+    tags = Column(ARRAY(Integer), nullable=True)  # Array of tag IDs
+    created_at = Column(DateTime, default=datetime.utcnow)
+    created_by = Column(Integer, ForeignKey(f'{SCHEMA_NAME}.users.id'), nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_by = Column(Integer, ForeignKey(f'{SCHEMA_NAME}.users.id'), nullable=False)
 
 # Complex query with joins/filters
 # from sqlalchemy import and_

@@ -42,26 +42,15 @@ class UserResponse(UserBase):
         from_attributes = True
 
 class ProjectCreate(BaseModel):
-    name: constr(min_length=1, max_length=255)
-    description: Optional[str] = None
+    name: str
+    description: str = None
+    status: int = 1
     team_id: Optional[int] = None
     boq_id: Optional[int] = None
-    activity_id: Optional[int] = None
-    tag_id: Optional[int] = None
-    status: int = Field(default=1)  # 1: Active, 0: Inactive
+    tags: List[str] = []
 
     class Config:
-        json_schema_extra = {
-            "example": {
-                "name": "New Office Building Project",
-                "description": "Construction of a new 10-story office building",
-                "team_id": 1,
-                "boq_id": 1,
-                "activity_id": 1,
-                "tag_id": 1,
-                "status": 1
-            }
-        }
+        from_attributes = True
 
 class ProjectResponse(BaseModel):
     id: int

@@ -12,7 +12,7 @@ from auth import get_password_hash, verify_password, get_current_user, create_us
 from fastapi_limiter import FastAPILimiter
 from fastapi_limiter.depends import RateLimiter
 import redis.asyncio as redis
-import datetime
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 from sqlalchemy.exc import IntegrityError
 from fastapi import APIRouter
@@ -325,6 +325,116 @@ async def get_project_detail(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred while fetching project details"
+        )
+    finally:
+        session.close()
+
+@router.post("/project/{projectId}/update", response_model=GeneralResponse)
+async def update_project(
+    projectId: int,
+    project: ProjectCreate,
+    current_user: User = Depends(get_current_user)
+):
+    session = get_session()
+    
+    try:
+        # Get existing project with permission check
+        existing_project = session.query(Project).filter(
+            Project.id == projectId,
+            Project.status == 1,
+            Project.updated_by == current_user.id
+        ).first()
+        
+        if not existing_project:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Project not found or you don't have permission to update it"
+            )
+
+        # Verify team access if team_id is provided and not -1
+        if project.team_id and project.team_id != -1:
+            team = session.query(Team).filter(
+                Team.id == project.team_id,
+                Team.company_id == current_user.company,
+                Team.status == 1
+            ).first()
+            if not team:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Team not found or you don't have access to it"
+                )
+
+        # Verify BOQ access if boq_id is provided and not -1
+        if project.boq_id and project.boq_id != -1:
+            boq = session.query(ProjectBoq).filter(
+                ProjectBoq.id == project.boq_id,
+                ProjectBoq.company_id == current_user.company,
+                ProjectBoq.status == 1
+            ).first()
+            if not boq:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="BOQ not found or you don't have access to it"
+                )
+
+        # Handle tags
+        tag_ids = []
+        if project.tags:
+            for tag_value in project.tags:
+                # Get the next available tag_index
+                max_index = session.query(Tag.tag_index).order_by(Tag.tag_index.desc()).first()
+                next_index = 1 if max_index is None else max_index[0] + 1
+                
+                # Create new tag
+                new_tag = Tag(
+                    tag_index=next_index,
+                    tag_type=1,  # You might want to make this configurable
+                    tag_value=tag_value,
+                    name=tag_value,
+                    description=f"Tag for project {projectId}",
+                    status=1,
+                    created_by=current_user.id,
+                    updated_by=current_user.id
+                )
+                session.add(new_tag)
+                session.flush()  # This will assign an ID to the new tag
+                tag_ids.append(new_tag.id)
+
+        # Update project fields
+        existing_project.name = project.name
+        existing_project.description = project.description
+        existing_project.status = project.status
+        
+        # Only update team_id if it's provided and not -1
+        if project.team_id is not None and project.team_id != -1:
+            existing_project.team_id = project.team_id
+            
+        # Only update boq_id if it's provided and not -1
+        if project.boq_id is not None and project.boq_id != -1:
+            existing_project.boq_id = project.boq_id
+            
+        existing_project.tag_id = tag_ids[0] if tag_ids else None  # Set the first tag as primary tag
+        existing_project.updated_by = current_user.id
+        existing_project.updated_at = datetime.now(timezone.utc)
+
+        session.commit()
+        session.refresh(existing_project)
+
+        return GeneralResponse(
+            message="Project updated successfully",
+            status=True,
+            code=status.HTTP_200_OK,
+            data=ProjectResponse.from_orm(existing_project)
+        )
+
+    except HTTPException as http_error:
+        raise http_error
+    except Exception as e:
+        print(f"Error updating project: {str(e)}")
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while updating the project"
         )
     finally:
         session.close()
