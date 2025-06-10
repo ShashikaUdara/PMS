@@ -133,6 +133,25 @@ export const projectService = {
       throw error.response?.data || { message: 'An error occurred while fetching projects' };
     }
   },
+  getProjectDetail: async (projectId) => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      const userId = user?.id;
+      if (!userId) {
+        throw new Error('User not found');
+      }
+
+      const queryParams = new URLSearchParams({
+        projectId: projectId.toString(),
+        userId: userId.toString()
+      });
+
+      const response = await api.get(`/project/detail?${queryParams.toString()}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'An error occurred while fetching project details' };
+    }
+  },
 };
 
 export default api; 

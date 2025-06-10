@@ -4,6 +4,7 @@ from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 from sqlalchemy import ForeignKey
 from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy import Text
 
 Base = declarative_base()
 
@@ -194,7 +195,7 @@ class Project(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     project_index = Column(Integer, nullable=True)
     name = Column(String(255), nullable=False)
-    description = Column(String(255), nullable=True)
+    description = Column(Text, nullable=True)
     status = Column(SmallInteger, nullable=True)
     company_id = Column(Integer, ForeignKey(f'{SCHEMA_NAME}.companies.id'), nullable=True)
     team_id = Column(Integer, ForeignKey(f'{SCHEMA_NAME}.teams.id'), nullable=True)

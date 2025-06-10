@@ -293,4 +293,40 @@ async def get_project_list(
     finally:
         session.close()
 
+@router.get("/project/detail", response_model=GeneralResponse)
+async def get_project_detail(
+    projectId: int,
+    current_user: User = Depends(get_current_user)
+):
+    session = get_session()
+    
+    # Get project with user permission check
+    project = session.query(Project).filter(
+        Project.id == projectId,
+        Project.status == 1,
+        Project.created_by == current_user.id  # Only allow access to projects created by the user
+    ).first()
+    
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found or you don't have permission to access it"
+        )
+    
+    try:
+        return GeneralResponse(
+            message="Project detail retrieved successfully",
+            status=True,
+            code=status.HTTP_200_OK,
+            data=ProjectResponse.from_orm(project)
+        )
+    except Exception as e:
+        print(f"Error fetching project details: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while fetching project details"
+        )
+    finally:
+        session.close()
+
 app.include_router(router)
