@@ -120,7 +120,7 @@ export const projectService = {
         queryParams.append('search', search);
       }
       if (status && status !== 'all') {
-        queryParams.append('status', status);
+        queryParams.append('project_status', status);
       }
       if (sortField && sortDirection) {
         queryParams.append('sortField', sortField);

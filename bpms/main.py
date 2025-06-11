@@ -216,6 +216,8 @@ async def get_project_list(
     limit: int = 10,
     sortField: str = "created_at",
     sortDirection: str = "desc",
+    search: str = None,
+    project_status: int = None,
     current_user: User = Depends(get_current_user)
 ):
     session = get_session()
@@ -234,23 +236,33 @@ async def get_project_list(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
-    
-    print("reached here")
 
     try:
+        # Build base query
+        base_query = session.query(Project).filter(
+            Project.created_by == userId
+        )
+
+        # Apply status filter if provided
+        if project_status is not None:
+            base_query = base_query.filter(Project.status == project_status)
+
+        # Apply search filter if search parameter is provided
+        if search and search.strip():
+            search_term = f"%{search.strip()}%"
+            base_query = base_query.filter(
+                or_(
+                    Project.name.ilike(search_term),
+                    Project.description.ilike(search_term),
+                    cast(Project.project_index, String).ilike(search_term)  # Search in project_index
+                )
+            )
+
+        # Get total count of projects after applying search and status filters
+        total_projects = base_query.count()
+
         # Calculate offset
         offset = (page - 1) * limit
-
-        # Get total count of projects
-        total_projects = session.query(Project).filter(
-            Project.created_by == userId,
-        ).count()
-
-        # Build the query with dynamic sorting
-        query = session.query(Project).filter(
-            Project.created_by == userId,
-            Project.status == 1
-        )
 
         # Get the sort column
         if hasattr(Project, sortField):
@@ -259,13 +271,13 @@ async def get_project_list(
                 sort_column = sort_column.desc()
             else:
                 sort_column = sort_column.asc()
-            query = query.order_by(sort_column)
+            base_query = base_query.order_by(sort_column)
         else:
             # Fallback to default sorting if invalid field
-            query = query.order_by(Project.created_at.desc())
+            base_query = base_query.order_by(Project.created_at.desc())
 
         # Get paginated and sorted projects
-        projects = query.offset(offset).limit(limit).all()
+        projects = base_query.offset(offset).limit(limit).all()
         
         # Transform projects to response model
         project_list = [ProjectResponse.from_orm(project) for project in projects]
@@ -343,7 +355,6 @@ async def update_project(
         # Get existing project with permission check
         existing_project = session.query(Project).filter(
             Project.id == projectId,
-            Project.status == 1,
             Project.updated_by == current_user.id
         ).first()
         
@@ -571,7 +582,6 @@ async def get_project_tasks(
         # Verify project exists and user has access
         project = session.query(Project).filter(
             Project.id == project_id,
-            Project.status == 1
         ).first()
         
         if not project:
