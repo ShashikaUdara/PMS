@@ -43,6 +43,7 @@ const ProjectTasks = ({ projectId }) => {
   const [tasks, setTasks] = useState([]);
   const [taskLoading, setTaskLoading] = useState(false);
   const [taskError, setTaskError] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -95,23 +96,22 @@ const ProjectTasks = ({ projectId }) => {
     }
   }, [projectId, currentPage, pageSize, searchTerm, sortField, sortDirection]);
 
-  // Update useEffect dependencies
+  // Single effect to handle all data fetching
   useEffect(() => {
     fetchTasks();
   }, [fetchTasks]);
 
-  // Update search effect dependencies
+  // Handle search input with debounce
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
-      if (currentPage === 1) {
-        fetchTasks();
-      } else {
+      if (searchInput !== searchTerm) {
+        setSearchTerm(searchInput);
         setCurrentPage(1);
       }
-    }, 500);
+    }, 1000);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm, currentPage, fetchTasks]);
+  }, [searchInput, searchTerm]);
 
   const handleFileChange = (event) => {
     const file = event.target.files[0];
@@ -220,14 +220,66 @@ const ProjectTasks = ({ projectId }) => {
   return (
     <Card>
       <Card.Body>
-        <div className="d-flex justify-content-end mb-4">
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <div className="d-flex align-items-center gap-3">
+            <InputGroup size="sm" style={{ width: '250px' }}>
+              <InputGroup.Text style={styles.controlText}>
+                <i className="bi bi-search"></i>
+              </InputGroup.Text>
+              <Form.Control
+                placeholder="Search tasks..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                style={styles.controlText}
+                size="sm"
+              />
+            </InputGroup>
+
+            <Form.Select
+              size="sm"
+              style={{ width: 'auto', ...styles.controlText }}
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+            >
+              <option value={10}>10 per page</option>
+              <option value={20}>20 per page</option>
+              <option value={50}>50 per page</option>
+            </Form.Select>
+
+            <div className="d-flex align-items-center text-muted" style={styles.smallText}>
+              Page {currentPage} of {totalPages} ({totalItems} items)
+            </div>
+
+            <div className="d-flex gap-1">
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(currentPage - 1)}
+              >
+                <i className="bi bi-chevron-left"></i>
+              </Button>
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(currentPage + 1)}
+              >
+                <i className="bi bi-chevron-right"></i>
+              </Button>
+            </div>
+          </div>
+
           <div className="d-flex align-items-center gap-2">
             <Form.Control
               type="file"
               accept=".csv"
               onChange={handleFileChange}
-              style={{ maxWidth: '300px', ...styles.controlText }}
-              className="form-control-sm"
+              style={{ maxWidth: '250px', ...styles.controlText }}
+              size="sm"
             />
             <Button
               variant="outline-primary"
@@ -316,59 +368,6 @@ const ProjectTasks = ({ projectId }) => {
 
         {/* Task List Section */}
         <div className="mb-3">
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <div className="d-flex align-items-center gap-4">
-              <div className="d-flex align-items-center">
-                <i className="bi bi-list-task" style={styles.statsIcon}></i>
-                <div>
-                  <div style={styles.statsValue}>{totalItems}</div>
-                  <div style={styles.statsLabel}></div>
-                </div>
-              </div>
-              <div className="d-flex align-items-center">
-                <i className="bi bi-grid" style={styles.statsIcon}></i>
-                <div>
-                  <div style={styles.statsValue}>{pageSize}</div>
-                  <div style={styles.statsLabel}></div>
-                </div>
-              </div>
-              <div className="d-flex align-items-center">
-                <i className="bi bi-book" style={styles.statsIcon}></i>
-                <div>
-                  <div style={styles.statsValue}>{totalPages}</div>
-                  <div style={styles.statsLabel}></div>
-                </div>
-              </div>
-            </div>
-            <div className="d-flex gap-2">
-              <InputGroup style={{ maxWidth: '300px' }}>
-                <InputGroup.Text style={styles.controlText}>
-                  <i className="bi bi-search"></i>
-                </InputGroup.Text>
-                <Form.Control
-                  placeholder="Search tasks..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  style={styles.controlText}
-                  className="form-control-sm"
-                />
-              </InputGroup>
-              <Form.Select
-                style={{ width: 'auto', ...styles.controlText }}
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                className="form-select-sm"
-              >
-                <option value={10}>10 per page</option>
-                <option value={20}>20 per page</option>
-                <option value={50}>50 per page</option>
-              </Form.Select>
-            </div>
-          </div>
-
           {taskError && <Alert variant="danger" className="mb-3" style={styles.smallText}>{taskError}</Alert>}
 
           <Table responsive hover className="align-middle">
@@ -432,33 +431,6 @@ const ProjectTasks = ({ projectId }) => {
               )}
             </tbody>
           </Table>
-
-          {tasks.length > 0 && (
-            <div className="d-flex justify-content-between align-items-center mt-3" style={styles.smallText}>
-              <div className="d-flex align-items-center">
-                <i className="bi bi-arrow-right-circle me-2"></i>
-                Showing page {currentPage} of {totalPages}
-              </div>
-              <div className="d-flex gap-2">
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                >
-                  <i className="bi bi-chevron-left"></i>
-                </Button>
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                >
-                  <i className="bi bi-chevron-right"></i>
-                </Button>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Create Task Modal */}

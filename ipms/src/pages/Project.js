@@ -26,7 +26,8 @@ const styles = {
   pageTitle: {
     fontSize: '1.5rem',
     fontWeight: '600',
-    color: '#2c3e50'
+    color: '#2c3e50',
+    margin: '0'
   },
   sectionTitle: {
     fontSize: '1.125rem',
@@ -76,8 +77,9 @@ const styles = {
   },
   headerNav: {
     borderBottom: 'none',
-    marginTop: '1rem',
-    gap: '0.5rem'
+    margin: '0',
+    height: '100%',
+    alignItems: 'center'
   },
   detailsCard: {
     backgroundColor: '#f8f9fa',
@@ -114,9 +116,7 @@ const styles = {
     alignItems: 'center',
     gap: '0.5rem',
     transition: 'all 0.2s ease-in-out',
-    '&:hover': {
-      transform: 'translateY(-1px)'
-    }
+    height: '32px'
   },
   contentCard: {
     border: 'none',
@@ -263,61 +263,64 @@ const Project = () => {
       <Card style={styles.headerCard}>
         <Card.Body>
           <div className="d-flex flex-column">
-            <div className="d-flex justify-content-between align-items-center">
-              <div>
-                <div className="d-flex align-items-center gap-3">
-                  <h4 className="mb-0" style={styles.pageTitle}>{project.name}</h4>
-                  <Badge bg={getStatusVariant(project.status)} style={styles.badge}>
-                    {getStatusLabel(project.status)}
-                  </Badge>
-                </div>
-                <p className="text-muted mb-0 mt-2">Project ID: {project.project_index}</p>
-              </div>
-              <div className="d-flex gap-2">
-                <Button
-                  variant="outline-secondary"
-                  size="sm"
-                  onClick={() => navigate('/projects')}
-                  style={styles.actionButton}
-                >
-                  <i className="bi bi-arrow-left"></i>
-                  Back
-                </Button>
-                <Button 
-                  variant="primary" 
-                  size="sm"
-                  onClick={() => setShowEditModal(true)}
-                  style={styles.actionButton}
-                >
-                  <i className="bi bi-pencil"></i>
-                  Edit
-                </Button>
-              </div>
-            </div>
-
-            <Nav variant="tabs" style={styles.headerNav} activeKey={activeTab} onSelect={setActiveTab}>
-              {[
-                { key: 'overview', icon: 'bi-info-circle', label: 'Overview' },
-                { key: 'tasks', icon: 'bi-list-task', label: 'Tasks' },
-                { key: 'team', icon: 'bi-people', label: 'Team' },
-                { key: 'documents', icon: 'bi-file-earmark-text', label: 'Documents' },
-                { key: 'settings', icon: 'bi-gear', label: 'Settings' }
-              ].map((item) => (
-                <Nav.Item key={item.key}>
-                  <Nav.Link 
-                    eventKey={item.key} 
-                    className="d-flex align-items-center gap-2"
-                    style={{
-                      ...styles.navLink,
-                      ...(activeTab === item.key ? styles.navLinkActive : {})
-                    }}
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <div className="d-flex align-items-center gap-3">
+                <div className="d-flex gap-2">
+                  <Button
+                    variant="outline-secondary"
+                    size="sm"
+                    onClick={() => navigate('/projects')}
+                    style={styles.actionButton}
                   >
-                    <i className={`bi ${item.icon}`}></i>
-                    {item.label}
-                  </Nav.Link>
-                </Nav.Item>
-              ))}
-            </Nav>
+                    <i className="bi bi-arrow-left"></i>
+                    Back
+                  </Button>
+                  <Button 
+                    variant="primary" 
+                    size="sm"
+                    onClick={() => setShowEditModal(true)}
+                    style={styles.actionButton}
+                  >
+                    <i className="bi bi-pencil"></i>
+                    Edit
+                  </Button>
+                </div>
+                <div className="vr"></div>
+                <div>
+                  <div className="d-flex align-items-center gap-3">
+                    <h4 className="mb-0" style={styles.pageTitle}>{project.name}</h4>
+                    <Badge bg={getStatusVariant(project.status)} style={styles.badge}>
+                      {getStatusLabel(project.status)}
+                    </Badge>
+                  </div>
+                  <p className="text-muted mb-0 mt-2">Project ID: {project.project_index}</p>
+                </div>
+              </div>
+
+              <Nav variant="tabs" style={styles.headerNav} activeKey={activeTab} onSelect={setActiveTab}>
+                {[
+                  { key: 'overview', icon: 'bi-info-circle', label: 'Overview' },
+                  { key: 'tasks', icon: 'bi-list-task', label: 'Tasks' },
+                  { key: 'team', icon: 'bi-people', label: 'Team' },
+                  { key: 'documents', icon: 'bi-file-earmark-text', label: 'Documents' },
+                  { key: 'settings', icon: 'bi-gear', label: 'Settings' }
+                ].map((item) => (
+                  <Nav.Item key={item.key}>
+                    <Nav.Link 
+                      eventKey={item.key} 
+                      className="d-flex align-items-center gap-2"
+                      style={{
+                        ...styles.navLink,
+                        ...(activeTab === item.key ? styles.navLinkActive : {})
+                      }}
+                    >
+                      <i className={`bi ${item.icon}`}></i>
+                      {item.label}
+                    </Nav.Link>
+                  </Nav.Item>
+                ))}
+              </Nav>
+            </div>
           </div>
         </Card.Body>
       </Card>

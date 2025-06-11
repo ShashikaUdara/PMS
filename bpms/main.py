@@ -18,6 +18,8 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 from sqlalchemy.exc import IntegrityError
 from fastapi import APIRouter
+from sqlalchemy import or_, cast
+from sqlalchemy.types import String
 
 load_dotenv()
 
@@ -560,6 +562,7 @@ async def get_project_tasks(
     limit: int = 10,
     sortField: str = "created_at",
     sortDirection: str = "desc",
+    search: str = None,
     current_user: User = Depends(get_current_user)
 ):
     session = get_session()
@@ -585,18 +588,27 @@ async def get_project_tasks(
                 detail="You don't have permission to access this project's tasks"
             )
 
-        # Calculate offset for pagination
-        offset = (page - 1) * limit
-
-        # Get total count of tasks
-        total_tasks = session.query(ProjectTask).filter(
-            ProjectTask.project_id == project_id
-        ).count()
-
-        # Build the query with dynamic sorting
-        query = session.query(ProjectTask).filter(
+        # Build base query
+        base_query = session.query(ProjectTask).filter(
             ProjectTask.project_id == project_id
         )
+
+        # Apply search filter if search parameter is provided
+        if search and search.strip():
+            search_term = f"%{search.strip()}%"
+            base_query = base_query.filter(
+                or_(
+                    ProjectTask.title.ilike(search_term),
+                    ProjectTask.description.ilike(search_term),
+                    cast(ProjectTask.task_index, String).ilike(search_term)  # Search in task_index
+                )
+            )
+
+        # Get total count of tasks after applying search
+        total_tasks = base_query.count()
+
+        # Calculate offset for pagination
+        offset = (page - 1) * limit
 
         # Apply sorting
         if hasattr(ProjectTask, sortField):
@@ -605,13 +617,13 @@ async def get_project_tasks(
                 sort_column = sort_column.desc()
             else:
                 sort_column = sort_column.asc()
-            query = query.order_by(sort_column)
+            base_query = base_query.order_by(sort_column)
         else:
             # Fallback to default sorting
-            query = query.order_by(ProjectTask.created_at.desc())
+            base_query = base_query.order_by(ProjectTask.created_at.desc())
 
         # Get paginated tasks
-        tasks = query.offset(offset).limit(limit).all()
+        tasks = base_query.offset(offset).limit(limit).all()
 
         # Transform tasks to dict for response
         task_list = []
