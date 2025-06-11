@@ -70,3 +70,12 @@ class ProjectResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class TaskImportResponse(BaseModel):
+    total_rows: int
+    imported_rows: int
+    failed_rows: int
+    errors: List[str]
+
+    class Config:
+        from_attributes = True

@@ -167,6 +167,68 @@ export const projectService = {
       throw error.response?.data || { message: 'An error occurred while updating the project' };
     }
   },
+  importTasks: async (projectId, formData) => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      const userId = user?.id;
+      if (!userId) {
+        throw new Error('User not found');
+      }
+      
+      // Override the default Content-Type header for file upload
+      const config = {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      };
+      
+      const response = await api.post(`/project/${projectId}/tasks/import`, formData, config);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'An error occurred while importing tasks' };
+    }
+  },
+  getProjectTasks: async (projectId, page = 1, limit = 10, search = '', sortField = '', sortDirection = '') => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      const userId = user?.id;
+      if (!userId) {
+        throw new Error('User not found');
+      }
+
+      const queryParams = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString()
+      });
+
+      if (search) {
+        queryParams.append('search', search);
+      }
+      if (sortField && sortDirection) {
+        queryParams.append('sortField', sortField);
+        queryParams.append('sortDirection', sortDirection);
+      }
+
+      const response = await api.get(`/project/${projectId}/tasks/get?${queryParams.toString()}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'An error occurred while fetching project tasks' };
+    }
+  },
+  createTask: async (projectId, taskData) => {
+    try {
+      const user = JSON.parse(localStorage.getItem('user'));
+      const userId = user?.id;
+      if (!userId) {
+        throw new Error('User not found');
+      }
+
+      const response = await api.post(`/project/${projectId}/task/create`, taskData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'An error occurred while creating the task' };
+    }
+  },
 };
 
 export default api; 

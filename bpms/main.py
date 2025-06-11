@@ -1,12 +1,14 @@
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from typing import List
 import os
-from repository import get_session, insert_project_activity, User, UserSession, Project, Team, ProjectBoq, ProjectActivity, Tag
+import csv
+import io
+from repository import get_session, insert_project_activity, User, UserSession, Project, Team, ProjectBoq, ProjectActivity, Tag, ProjectTask
 from models import (
     UserSignup, GeneralResponse, UserSignin, Token, UserResponse,
-    ProjectCreate, ProjectResponse
+    ProjectCreate, ProjectResponse, TaskImportResponse
 )
 from auth import get_password_hash, verify_password, get_current_user, create_user_token
 from fastapi_limiter import FastAPILimiter
@@ -240,7 +242,6 @@ async def get_project_list(
         # Get total count of projects
         total_projects = session.query(Project).filter(
             Project.created_by == userId,
-            Project.status == 1
         ).count()
 
         # Build the query with dynamic sorting
@@ -303,7 +304,6 @@ async def get_project_detail(
     # Get project with user permission check
     project = session.query(Project).filter(
         Project.id == projectId,
-        Project.status == 1,
         Project.created_by == current_user.id  # Only allow access to projects created by the user
     ).first()
     
@@ -435,6 +435,234 @@ async def update_project(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error occurred while updating the project"
+        )
+    finally:
+        session.close()
+
+@router.post("/project/{project_id}/tasks/import", response_model=GeneralResponse)
+async def import_project_tasks(
+    project_id: int,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    session = get_session()
+    
+    # Verify project exists and user has access
+    project = session.query(Project).filter(
+        Project.id == project_id,
+        Project.status == 1
+    ).first()
+    
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found or you don't have access to it"
+        )
+    
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only CSV files are allowed"
+        )
+    
+    try:
+        # Read the CSV file
+        contents = await file.read()
+        csv_file = io.StringIO(contents.decode('utf-8'))
+        csv_reader = csv.DictReader(csv_file)
+        
+        import_stats = {
+            'total_rows': 0,
+            'imported_rows': 0,
+            'failed_rows': 0,
+            'errors': []
+        }
+        
+        # Get the latest task index for this project
+        latest_task = session.query(ProjectTask).filter(
+            ProjectTask.project_id == project_id
+        ).order_by(ProjectTask.task_index.desc()).first()
+        
+        next_task_index = 1 if not latest_task else latest_task.task_index + 1
+        
+        for row in csv_reader:
+            import_stats['total_rows'] += 1
+            try:
+                # Convert string values to appropriate types
+                priority = int(row.get('priority', 1))
+                task_status = int(row.get('status', 1))
+                estimated_hours = int(row.get('estimated_hours')) if row.get('estimated_hours') else None
+                actual_hours = int(row.get('actual_hours')) if row.get('actual_hours') else None
+                
+                # Parse dates if provided
+                start_date = datetime.fromisoformat(row['start_date']) if row.get('start_date') else None
+                due_date = datetime.fromisoformat(row['due_date']) if row.get('due_date') else None
+                completed_date = datetime.fromisoformat(row['completed_date']) if row.get('completed_date') else None
+                
+                # Create new task
+                new_task = ProjectTask(
+                    task_index=next_task_index,
+                    project_id=project_id,
+                    title=row['task_name'],
+                    description=row.get('description'),
+                    priority=priority,
+                    status=task_status,
+                    assigned_to=int(row['assigned_to']) if row.get('assigned_to') else None,
+                    estimated_hours=estimated_hours,
+                    actual_hours=actual_hours,
+                    start_date=start_date,
+                    due_date=due_date,
+                    completed_date=completed_date,
+                    parent_task_id=int(row['parent_task_id']) if row.get('parent_task_id') else None,
+                    tags=row.get('tags', '').split(',') if row.get('tags') else None,
+                    created_by=current_user.id,
+                    updated_by=current_user.id
+                )
+                
+                session.add(new_task)
+                next_task_index += 1
+                import_stats['imported_rows'] += 1
+                
+            except Exception as e:
+                import_stats['failed_rows'] += 1
+                import_stats['errors'].append(f"Error in row {import_stats['total_rows']}: {str(e)}")
+                continue
+        
+        session.commit()
+
+        print("reached here")
+        
+        return GeneralResponse(
+            message="Tasks imported successfully",
+            status=True,
+            code=status.HTTP_201_CREATED,
+            data=TaskImportResponse(
+                total_rows=import_stats['total_rows'],
+                imported_rows=import_stats['imported_rows'],
+                failed_rows=import_stats['failed_rows'],
+                errors=import_stats['errors']
+            )
+        )
+        
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error importing tasks: {str(e)}"
+        )
+    finally:
+        await file.close()
+
+@router.get("/project/{project_id}/tasks/get", response_model=GeneralResponse)
+async def get_project_tasks(
+    project_id: int,
+    page: int = 1,
+    limit: int = 10,
+    sortField: str = "created_at",
+    sortDirection: str = "desc",
+    current_user: User = Depends(get_current_user)
+):
+    session = get_session()
+    
+    try:
+        # Verify project exists and user has access
+        project = session.query(Project).filter(
+            Project.id == project_id,
+            Project.status == 1
+        ).first()
+        
+        if not project:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Project not found"
+            )
+            
+        # Check if user has access to the project
+        # Allow access if user is admin (role=1) or if they created the project
+        if current_user.role != 1 and project.created_by != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to access this project's tasks"
+            )
+
+        # Calculate offset for pagination
+        offset = (page - 1) * limit
+
+        # Get total count of tasks
+        total_tasks = session.query(ProjectTask).filter(
+            ProjectTask.project_id == project_id
+        ).count()
+
+        # Build the query with dynamic sorting
+        query = session.query(ProjectTask).filter(
+            ProjectTask.project_id == project_id
+        )
+
+        # Apply sorting
+        if hasattr(ProjectTask, sortField):
+            sort_column = getattr(ProjectTask, sortField)
+            if sortDirection.lower() == "desc":
+                sort_column = sort_column.desc()
+            else:
+                sort_column = sort_column.asc()
+            query = query.order_by(sort_column)
+        else:
+            # Fallback to default sorting
+            query = query.order_by(ProjectTask.created_at.desc())
+
+        # Get paginated tasks
+        tasks = query.offset(offset).limit(limit).all()
+
+        # Transform tasks to dict for response
+        task_list = []
+        for task in tasks:
+            task_dict = {
+                "id": task.id,
+                "task_index": task.task_index,
+                "title": task.title,
+                "description": task.description,
+                "priority": task.priority,
+                "status": task.status,
+                "assigned_to": task.assigned_to,
+                "estimated_hours": task.estimated_hours,
+                "actual_hours": task.actual_hours,
+                "start_date": task.start_date,
+                "due_date": task.due_date,
+                "completed_date": task.completed_date,
+                "parent_task_id": task.parent_task_id,
+                "tags": task.tags,
+                "created_at": task.created_at,
+                "created_by": task.created_by,
+                "updated_at": task.updated_at,
+                "updated_by": task.updated_by
+            }
+            task_list.append(task_dict)
+
+        # Calculate total pages
+        total_pages = (total_tasks + limit - 1) // limit
+
+        return GeneralResponse(
+            message="Project tasks retrieved successfully",
+            status=True,
+            code=status.HTTP_200_OK,
+            data={
+                "tasks": task_list,
+                "pagination": {
+                    "current_page": page,
+                    "total_pages": total_pages,
+                    "total_items": total_tasks,
+                    "items_per_page": limit
+                }
+            }
+        )
+
+    except HTTPException as http_error:
+        raise http_error
+    except Exception as e:
+        print(f"Error fetching project tasks: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while fetching project tasks: {str(e)}"
         )
     finally:
         session.close()
