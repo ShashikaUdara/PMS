@@ -8,7 +8,7 @@ import io
 from repository import get_session, insert_project_activity, User, UserSession, Project, Team, ProjectBoq, ProjectActivity, Tag, ProjectTask
 from models import (
     UserSignup, GeneralResponse, UserSignin, Token, UserResponse,
-    ProjectCreate, ProjectResponse, TaskImportResponse
+    ProjectCreate, ProjectResponse, TaskImportResponse, TaskCreate
 )
 from auth import get_password_hash, verify_password, get_current_user, create_user_token
 from fastapi_limiter import FastAPILimiter
@@ -685,6 +685,116 @@ async def get_project_tasks(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while fetching project tasks: {str(e)}"
+        )
+    finally:
+        session.close()
+
+@router.post("/project/{project_id}/task/create", response_model=GeneralResponse)
+async def create_project_task(
+    project_id: int,
+    task: TaskCreate,
+    current_user: User = Depends(get_current_user)
+):
+    session = get_session()
+    
+    try:
+        # Verify project exists and user has access
+        project = session.query(Project).filter(
+            Project.id == project_id
+        ).first()
+        
+        if not project:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Project not found"
+            )
+            
+        # Check if user has access to the project
+        if current_user.role != 1 and project.created_by != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to create tasks in this project"
+            )
+
+        # Get the latest task index for this project
+        latest_task = session.query(ProjectTask).filter(
+            ProjectTask.project_id == project_id
+        ).order_by(ProjectTask.task_index.desc()).first()
+        
+        next_task_index = 1 if not latest_task else latest_task.task_index + 1
+
+        # Validate parent task if provided
+        if task.parent_task_id:
+            parent_task = session.query(ProjectTask).filter(
+                ProjectTask.id == task.parent_task_id,
+                ProjectTask.project_id == project_id
+            ).first()
+            if not parent_task:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Parent task not found in this project"
+                )
+
+        # Create new task
+        new_task = ProjectTask(
+            task_index=next_task_index,
+            project_id=project_id,
+            title=task.title,
+            description=task.description,
+            priority=task.priority,
+            status=task.status,
+            assigned_to=task.assigned_to,
+            estimated_hours=task.estimated_hours,
+            actual_hours=task.actual_hours,
+            start_date=task.start_date,
+            due_date=task.end_date,  # Map end_date from request to due_date in DB
+            parent_task_id=task.parent_task_id,
+            tags=task.tags,
+            created_by=current_user.id,
+            updated_by=current_user.id
+        )
+        
+        session.add(new_task)
+        session.commit()
+        session.refresh(new_task)
+
+        # Transform task to dict for response
+        task_dict = {
+            "id": new_task.id,
+            "task_index": new_task.task_index,
+            "title": new_task.title,
+            "description": new_task.description,
+            "priority": new_task.priority,
+            "status": new_task.status,
+            "assigned_to": new_task.assigned_to,
+            "estimated_hours": new_task.estimated_hours,
+            "actual_hours": new_task.actual_hours,
+            "start_date": new_task.start_date,
+            "due_date": new_task.due_date,
+            "completed_date": new_task.completed_date,
+            "parent_task_id": new_task.parent_task_id,
+            "tags": new_task.tags,
+            "created_at": new_task.created_at,
+            "created_by": new_task.created_by,
+            "updated_at": new_task.updated_at,
+            "updated_by": new_task.updated_by
+        }
+        
+        return GeneralResponse(
+            message="Task created successfully",
+            status=True,
+            code=status.HTTP_201_CREATED,
+            data=task_dict
+        )
+        
+    except HTTPException as http_error:
+        raise http_error
+    except Exception as e:
+        session.rollback()
+        print(f"Error creating task: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while creating the task: {str(e)}"
         )
     finally:
         session.close()

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Container, 
@@ -86,21 +86,8 @@ const Projects = () => {
   const [sortField, setSortField] = useState('project_index');
   const [sortDirection, setSortDirection] = useState('desc');
 
-  // Debounce search term to avoid too many API calls
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      fetchProjects();
-    }, 500);
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm]);
-
-  // Fetch when filters, sorting, or pagination changes
-  useEffect(() => {
-    fetchProjects();
-  }, [statusFilter, currentPage, pageSize, sortField, sortDirection]);
-
-  const fetchProjects = async () => {
+  // Move fetchProjects into useCallback to prevent infinite loops
+  const fetchProjects = useCallback(async () => {
     setLoading(true);
     try {
       const response = await projectService.getProjects(
@@ -125,7 +112,21 @@ const Projects = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, pageSize, searchTerm, statusFilter, sortField, sortDirection]);
+
+  // Debounce search term to avoid too many API calls
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      fetchProjects();
+    }, 500);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [fetchProjects]);
+
+  // Fetch when filters, sorting, or pagination changes
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
 
   // Handle search input change
   const handleSearchChange = (e) => {
@@ -200,27 +201,6 @@ const Projects = () => {
     }
   };
 
-  // Filter and sort projects
-  const filteredProjects = useMemo(() => {
-    return (projects || [])
-      .filter(project => {
-        const matchesSearch = (project.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (project.id || '').toString().toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesStatus = statusFilter === 'all' || project.status === statusFilter;
-        return matchesSearch && matchesStatus;
-      })
-      .sort((a, b) => {
-        const aValue = a[sortField] || '';
-        const bValue = b[sortField] || '';
-        const direction = sortDirection === 'asc' ? 1 : -1;
-        
-        if (typeof aValue === 'string') {
-          return aValue.localeCompare(bValue) * direction;
-        }
-        return ((aValue || 0) - (bValue || 0)) * direction;
-      });
-  }, [projects, searchTerm, statusFilter, sortField, sortDirection]);
-
   const getStatusLabel = (status) => {
     switch (status) {
       case 1:
@@ -249,10 +229,6 @@ const Projects = () => {
       default:
         return 'secondary';
     }
-  };
-
-  const getStatusBadge = (status) => {
-    return <Badge bg={getStatusVariant(status)}>{getStatusLabel(status)}</Badge>;
   };
 
   const formatDate = (dateString) => {

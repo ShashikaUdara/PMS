@@ -79,3 +79,19 @@ class TaskImportResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class TaskCreate(BaseModel):
+    title: str
+    description: str = None
+    priority: int
+    status: int
+    start_date: datetime = None
+    end_date: datetime = None
+    assigned_to: int = None
+    estimated_hours: int = None
+    actual_hours: int = None
+    parent_task_id: int = None
+    tags: List[int] = None
+
+    class Config:
+        from_attributes = True

@@ -3,6 +3,52 @@ import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { Container, Navbar, Nav, Button } from 'react-bootstrap';
 import UserMenu from '../components/UserMenu';
 
+// Add styles for consistent sizing
+const styles = {
+  sidebar: {
+    minHeight: '100vh',
+    transition: 'width 0.3s ease',
+    fontSize: '85%'
+  },
+  sidebarExpanded: {
+    width: '240px'
+  },
+  sidebarCollapsed: {
+    width: '72px'
+  },
+  navLink: {
+    fontSize: '90%',
+    padding: '0.6rem 1rem',
+    color: '#ffffff80',
+    textDecoration: 'none',
+    transition: 'all 0.2s ease',
+    '&:hover': {
+      color: '#fff',
+      backgroundColor: 'rgba(255, 255, 255, 0.1)'
+    }
+  },
+  navLinkActive: {
+    color: '#fff',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)'
+  },
+  navIcon: {
+    fontSize: '1rem',
+    width: '24px'
+  },
+  toggleButton: {
+    fontSize: '90%',
+    padding: '0.6rem 1rem',
+    color: '#ffffff80',
+    '&:hover': {
+      color: '#fff'
+    }
+  },
+  brandText: {
+    fontSize: '1.1rem',
+    fontWeight: '600'
+  }
+};
+
 const menuItems = [
   { text: 'Dashboard', icon: 'bi-speedometer2', path: '/dashboard' },
   { text: 'Projects', icon: 'bi-folder', path: '/projects' },
@@ -19,16 +65,17 @@ const DashboardLayout = () => {
     <div className="d-flex">
       {/* Sidebar */}
       <div 
-        className={`bg-dark text-white ${expanded ? 'width-240' : 'width-72'}`}
+        className="bg-dark text-white"
         style={{
-          minHeight: '100vh',
-          transition: 'width 0.3s ease',
+          ...styles.sidebar,
+          ...(expanded ? styles.sidebarExpanded : styles.sidebarCollapsed)
         }}
       >
         <div className="d-flex flex-column h-100">
           <Button 
             variant="link" 
-            className="text-white text-decoration-none p-3 border-0"
+            className="text-white text-decoration-none border-0"
+            style={styles.toggleButton}
             onClick={() => setExpanded(!expanded)}
           >
             <i className={`bi ${expanded ? 'bi-chevron-left' : 'bi-list'}`}></i>
@@ -38,13 +85,16 @@ const DashboardLayout = () => {
             {menuItems.map((item) => (
               <Nav.Link
                 key={item.text}
-                className={`px-3 py-2 d-flex align-items-center ${
-                  location.pathname === item.path ? 'bg-primary' : ''
-                }`}
+                style={{
+                  ...styles.navLink,
+                  ...(location.pathname === item.path ? styles.navLinkActive : {})
+                }}
                 onClick={() => navigate(item.path)}
               >
-                <i className={`bi ${item.icon} me-2`}></i>
-                {expanded && <span>{item.text}</span>}
+                <div className="d-flex align-items-center">
+                  <i className={`bi ${item.icon}`} style={styles.navIcon}></i>
+                  {expanded && <span className="ms-2">{item.text}</span>}
+                </div>
               </Nav.Link>
             ))}
           </Nav>
@@ -54,7 +104,7 @@ const DashboardLayout = () => {
       {/* Main content */}
       <div className="flex-grow-1">
         <Navbar bg="white" className="border-bottom px-4">
-          <Navbar.Brand className="fw-bold">BEEPMS</Navbar.Brand>
+          <Navbar.Brand style={styles.brandText}>BEEPMS</Navbar.Brand>
           <Navbar.Toggle />
           <Navbar.Collapse className="justify-content-end">
             <UserMenu />

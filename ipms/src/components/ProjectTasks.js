@@ -59,11 +59,42 @@ const ProjectTasks = ({ projectId }) => {
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
-    priority: 'medium',
-    status: 'pending',
+    priority: 1,
+    status: 1,
     start_date: '',
     end_date: ''
   });
+
+  // Add status utility functions
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case 1:
+        return 'Active';
+      case 2:
+        return 'Completed';
+      case 3:
+        return 'On Hold';
+      case 4:
+        return 'Cancelled';
+      default:
+        return 'Unknown';
+    }
+  };
+
+  const getStatusVariant = (status) => {
+    switch (status) {
+      case 1:
+        return 'primary';
+      case 2:
+        return 'success';
+      case 3:
+        return 'warning';
+      case 4:
+        return 'danger';
+      default:
+        return 'secondary';
+    }
+  };
 
   // Move fetchTasks into useCallback
   const fetchTasks = useCallback(async () => {
@@ -196,8 +227,8 @@ const ProjectTasks = ({ projectId }) => {
       setNewTask({
         title: '',
         description: '',
-        priority: 'medium',
-        status: 'pending',
+        priority: 1,
+        status: 1,
         start_date: '',
         end_date: ''
       });
@@ -412,8 +443,8 @@ const ProjectTasks = ({ projectId }) => {
                     <td>{task.task_index}</td>
                     <td>{task.title}</td>
                     <td>
-                      <Badge bg={task.status === 'active' ? 'success' : 'secondary'}>
-                        {task.status}
+                      <Badge bg={getStatusVariant(task.status)}>
+                        {getStatusLabel(task.status)}
                       </Badge>
                     </td>
                     <td>{new Date(task.due_date).toLocaleDateString()}</td>
@@ -481,9 +512,9 @@ const ProjectTasks = ({ projectId }) => {
                       onChange={handleInputChange}
                       style={styles.controlText}
                     >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
+                      <option value="1">Low</option>
+                      <option value="2">Medium</option>
+                      <option value="3">High</option>
                     </Form.Select>
                   </Form.Group>
                 </Col>
@@ -496,10 +527,10 @@ const ProjectTasks = ({ projectId }) => {
                       onChange={handleInputChange}
                       style={styles.controlText}
                     >
-                      <option value="pending">Pending</option>
-                      <option value="in_progress">In Progress</option>
-                      <option value="completed">Completed</option>
-                      <option value="on_hold">On Hold</option>
+                      <option value="1">Active</option>
+                      <option value="2">Completed</option>
+                      <option value="3">On Hold</option>
+                      <option value="4">Cancelled</option>
                     </Form.Select>
                   </Form.Group>
                 </Col>
