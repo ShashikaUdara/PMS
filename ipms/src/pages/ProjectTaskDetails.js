@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Button, Badge, Spinner, Alert, Container } from 'react-bootstrap';
+import { Button, Badge, Spinner, Alert, Container, Accordion, Collapse } from 'react-bootstrap';
 import { projectService } from '../services/api';
 
 // Dummy activities for demonstration (can be replaced with real data)
@@ -205,6 +205,7 @@ const ProjectTaskDetails = () => {
   const [task, setTask] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showDescription, setShowDescription] = useState(false);
 
   useEffect(() => {
     const fetchTask = async () => {
@@ -242,13 +243,29 @@ const ProjectTaskDetails = () => {
           <i className="bi bi-arrow-left me-2"></i>
           Back
         </Button>
+        <Button
+          variant="link"
+          size="sm"
+          style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)', zIndex: 2 }}
+          onClick={() => setShowDescription((prev) => !prev)}
+          aria-label="Show description"
+        >
+          <i className="bi bi-list" style={{ fontSize: '1.5rem', color: '#2c3e50' }}></i>
+        </Button>
       </div>
+      <Collapse in={showDescription}>
+        <div>
+          <div style={{ ...styles.metaCard, marginTop: 0, marginBottom: '1rem', animation: 'fadeIn 0.3s' }}>
+            <h5 style={{ marginBottom: '0.5rem', color: '#2c3e50' }}>Description</h5>
+            <p style={styles.taskDescription}>{task.description}</p>
+          </div>
+        </div>
+      </Collapse>
 
       <div style={styles.metaCard}>
         <div style={styles.metaHeader}>
           <div style={styles.taskInfo}>
             <h1 style={styles.taskName}>{task.title}</h1>
-            <p style={styles.taskDescription}>{task.description}</p>
           </div>
           <div style={styles.metaInfo}>
             <div style={styles.metaItem}>

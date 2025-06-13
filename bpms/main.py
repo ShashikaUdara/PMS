@@ -5,7 +5,12 @@ from typing import List
 import os
 import csv
 import io
-from repository import get_session, insert_project_activity, User, UserSession, Project, Team, ProjectBoq, ProjectActivity, Tag, ProjectTask
+from repository import (
+    get_session, insert_project_activity, User, UserSession, Project, Team, 
+    ProjectBoq, ProjectActivity, Tag, ProjectTask, Base, engine, 
+    insert_default_units_and_measurements, insert_default_construction_standard_types,
+    insert_default_construction_standards, insert_default_admin_user
+)
 from models import (
     UserSignup, GeneralResponse, UserSignin, Token, UserResponse,
     ProjectCreate, ProjectResponse, TaskImportResponse, TaskCreate
@@ -44,11 +49,29 @@ app.add_middleware(
 # Setup Redis for rate limiting
 @app.on_event("startup")
 async def startup():
+    # Initialize Redis for rate limiting
     redis_host = os.getenv("REDIS_HOST", "localhost")
     redis_port = int(os.getenv("REDIS_PORT", 6379))
     redis_url = f"redis://{redis_host}:{redis_port}"
     redis_instance = redis.from_url(redis_url, encoding="utf-8", decode_responses=True)
     await FastAPILimiter.init(redis_instance)
+
+    # Create database tables and insert default data
+    try:
+        Base.metadata.create_all(engine)
+        
+        # Create admin user first
+        admin_id = insert_default_admin_user()
+        
+        # Then insert other default data
+        insert_default_units_and_measurements()
+        insert_default_construction_standard_types(admin_id)
+        insert_default_construction_standards(admin_id)
+        
+        print("Database tables created and default data inserted successfully")
+    except Exception as e:
+        print(f"Error during database initialization: {str(e)}")
+        raise e
 
 @router.post("/user/signup", response_model=GeneralResponse, dependencies=[Depends(RateLimiter(times=5, seconds=60))])
 async def signup(user: UserSignup):
