@@ -229,6 +229,30 @@ export const projectService = {
       throw error.response?.data || { message: 'An error occurred while creating the task' };
     }
   },
+  updateTask: async (projectId, taskId, taskData) => {
+    try {
+      const response = await api.post(`/project/${projectId}/task/${taskId}/update`, taskData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'An error occurred while updating the task' };
+    }
+  },
+  deleteTask: async (projectId, taskId) => {
+    try {
+      const response = await api.delete(`/project/${projectId}/task/${taskId}/delete`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'An error occurred while deleting the task' };
+    }
+  },
+  getTaskDetails: async (projectId, taskId) => {
+    try {
+      const response = await api.get(`/project/${projectId}/task/${taskId}/get`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { message: 'An error occurred while fetching task details' };
+    }
+  },
 };
 
 export default api; 

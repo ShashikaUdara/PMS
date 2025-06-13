@@ -463,7 +463,6 @@ async def import_project_tasks(
     # Verify project exists and user has access
     project = session.query(Project).filter(
         Project.id == project_id,
-        Project.status == 1
     ).first()
     
     if not project:
@@ -600,7 +599,8 @@ async def get_project_tasks(
 
         # Build base query
         base_query = session.query(ProjectTask).filter(
-            ProjectTask.project_id == project_id
+            ProjectTask.project_id == project_id,
+            ProjectTask.status != 0
         )
 
         # Apply search filter if search parameter is provided
@@ -795,6 +795,314 @@ async def create_project_task(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while creating the task: {str(e)}"
+        )
+    finally:
+        session.close()
+
+@router.post("/project/{project_id}/task/{task_id}/update", response_model=GeneralResponse)
+async def update_project_task(
+    project_id: int,
+    task_id: int,
+    task: TaskCreate,
+    current_user: User = Depends(get_current_user)
+):
+    session = get_session()
+    
+    try:
+        # Verify project exists and user has access
+        project = session.query(Project).filter(
+            Project.id == project_id
+        ).first()
+        
+        if not project:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Project not found"
+            )
+            
+        # Check if user has access to the project
+        if current_user.role != 1 and project.created_by != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to update tasks in this project"
+            )
+
+        # Get existing task
+        existing_task = session.query(ProjectTask).filter(
+            ProjectTask.id == task_id,
+            ProjectTask.project_id == project_id,
+            ProjectTask.status != 0
+        ).first()
+
+        if not existing_task:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Task not found in this project"
+            )
+
+        # Validate parent task if provided
+        if task.parent_task_id:
+            if task.parent_task_id == task_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Task cannot be its own parent"
+                )
+                
+            parent_task = session.query(ProjectTask).filter(
+                ProjectTask.id == task.parent_task_id,
+                ProjectTask.project_id == project_id
+            ).first()
+            if not parent_task:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Parent task not found in this project"
+                )
+
+        # Update task fields
+        existing_task.title = task.title
+        existing_task.description = task.description
+        existing_task.priority = task.priority
+        existing_task.status = task.status
+        existing_task.start_date = task.start_date
+        existing_task.due_date = task.end_date  # Map end_date from request to due_date in DB
+        existing_task.assigned_to = task.assigned_to
+        existing_task.estimated_hours = task.estimated_hours
+        existing_task.actual_hours = task.actual_hours
+        existing_task.parent_task_id = task.parent_task_id
+        existing_task.tags = task.tags
+        existing_task.updated_by = current_user.id
+        existing_task.updated_at = datetime.now(timezone.utc)
+
+        session.commit()
+        session.refresh(existing_task)
+
+        # Transform task to dict for response
+        task_dict = {
+            "id": existing_task.id,
+            "task_index": existing_task.task_index,
+            "title": existing_task.title,
+            "description": existing_task.description,
+            "priority": existing_task.priority,
+            "status": existing_task.status,
+            "assigned_to": existing_task.assigned_to,
+            "estimated_hours": existing_task.estimated_hours,
+            "actual_hours": existing_task.actual_hours,
+            "start_date": existing_task.start_date,
+            "due_date": existing_task.due_date,
+            "completed_date": existing_task.completed_date,
+            "parent_task_id": existing_task.parent_task_id,
+            "tags": existing_task.tags,
+            "created_at": existing_task.created_at,
+            "created_by": existing_task.created_by,
+            "updated_at": existing_task.updated_at,
+            "updated_by": existing_task.updated_by
+        }
+        
+        return GeneralResponse(
+            message="Task updated successfully",
+            status=True,
+            code=status.HTTP_200_OK,
+            data=task_dict
+        )
+        
+    except HTTPException as http_error:
+        raise http_error
+    except Exception as e:
+        session.rollback()
+        print(f"Error updating task: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while updating the task: {str(e)}"
+        )
+    finally:
+        session.close()
+
+@router.delete("/project/{project_id}/task/{task_id}/delete", response_model=GeneralResponse)
+async def delete_project_task(
+    project_id: int,
+    task_id: int,
+    current_user: User = Depends(get_current_user)
+):
+    session = get_session()
+    
+    try:
+        # Verify project exists and user has access
+        project = session.query(Project).filter(
+            Project.id == project_id
+        ).first()
+        
+        if not project:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Project not found"
+            )
+            
+        # Check if user has access to the project
+        if current_user.role != 1 and project.created_by != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to delete tasks in this project"
+            )
+
+        # Get existing task
+        existing_task = session.query(ProjectTask).filter(
+            ProjectTask.id == task_id,
+            ProjectTask.project_id == project_id
+        ).first()
+
+        if not existing_task:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Task not found in this project"
+            )
+
+        # Check if task has any subtasks
+        subtasks = session.query(ProjectTask).filter(
+            ProjectTask.parent_task_id == task_id,
+            ProjectTask.project_id == project_id
+        ).all()
+
+        # If there are subtasks, delete them first
+        for subtask in subtasks:
+            subtask.status = 0  # Soft delete by setting status to 0
+            subtask.updated_by = current_user.id
+            subtask.updated_at = datetime.now(timezone.utc)
+
+        # Soft delete the main task
+        existing_task.status = 0  # Soft delete by setting status to 0
+        existing_task.updated_by = current_user.id
+        existing_task.updated_at = datetime.now(timezone.utc)
+
+        session.commit()
+        
+        return GeneralResponse(
+            message="Task and its subtasks deleted successfully",
+            status=True,
+            code=status.HTTP_200_OK,
+            data={
+                "id": task_id,
+                "deleted_subtasks": len(subtasks)
+            }
+        )
+        
+    except HTTPException as http_error:
+        raise http_error
+    except Exception as e:
+        session.rollback()
+        print(f"Error deleting task: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while deleting the task: {str(e)}"
+        )
+    finally:
+        session.close()
+
+@router.get("/project/{project_id}/task/{task_id}/get", response_model=GeneralResponse)
+async def get_project_task(
+    project_id: int,
+    task_id: int,
+    current_user: User = Depends(get_current_user)
+):
+    session = get_session()
+    
+    try:
+        # Verify project exists and user has access
+        project = session.query(Project).filter(
+            Project.id == project_id
+        ).first()
+        
+        if not project:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Project not found"
+            )
+            
+        # Check if user has access to the project
+        if current_user.role != 1 and project.created_by != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to access tasks in this project"
+            )
+
+        # Get task details
+        task = session.query(ProjectTask).filter(
+            ProjectTask.id == task_id,
+            ProjectTask.project_id == project_id,
+            ProjectTask.status != 0
+        ).first()
+
+        if not task:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Task not found in this project"
+            )
+
+        # Get subtasks if any
+        subtasks = session.query(ProjectTask).filter(
+            ProjectTask.parent_task_id == task_id,
+            ProjectTask.project_id == project_id,
+            ProjectTask.status != 0
+        ).all()
+
+        # Transform task to dict for response
+        task_dict = {
+            "id": task.id,
+            "task_index": task.task_index,
+            "title": task.title,
+            "description": task.description,
+            "priority": task.priority,
+            "status": task.status,
+            "assigned_to": task.assigned_to,
+            "estimated_hours": task.estimated_hours,
+            "actual_hours": task.actual_hours,
+            "start_date": task.start_date,
+            "due_date": task.due_date,
+            "completed_date": task.completed_date,
+            "parent_task_id": task.parent_task_id,
+            "tags": task.tags,
+            "created_at": task.created_at,
+            "created_by": task.created_by,
+            "updated_at": task.updated_at,
+            "updated_by": task.updated_by,
+            "subtasks": [
+                {
+                    "id": subtask.id,
+                    "task_index": subtask.task_index,
+                    "title": subtask.title,
+                    "description": subtask.description,
+                    "priority": subtask.priority,
+                    "status": subtask.status,
+                    "assigned_to": subtask.assigned_to,
+                    "estimated_hours": subtask.estimated_hours,
+                    "actual_hours": subtask.actual_hours,
+                    "start_date": subtask.start_date,
+                    "due_date": subtask.due_date,
+                    "completed_date": subtask.completed_date,
+                    "parent_task_id": subtask.parent_task_id,
+                    "tags": subtask.tags,
+                    "created_at": subtask.created_at,
+                    "created_by": subtask.created_by,
+                    "updated_at": subtask.updated_at,
+                    "updated_by": subtask.updated_by
+                }
+                for subtask in subtasks
+            ]
+        }
+        
+        return GeneralResponse(
+            message="Task details retrieved successfully",
+            status=True,
+            code=status.HTTP_200_OK,
+            data=task_dict
+        )
+        
+    except HTTPException as http_error:
+        raise http_error
+    except Exception as e:
+        print(f"Error fetching task details: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while fetching task details: {str(e)}"
         )
     finally:
         session.close()

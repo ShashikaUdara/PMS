@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Button, Table, Alert, Form, Spinner, Collapse, InputGroup, Badge, Modal, Row, Col } from 'react-bootstrap';
 import { projectService } from '../services/api';
+import { useNavigate } from 'react-router-dom';
 
 // Add custom styles
 const styles = {
@@ -27,6 +28,85 @@ const styles = {
   },
   importIcon: {
     color: '#0056b3' // darker blue color
+  },
+  drawer: {
+    position: 'fixed',
+    top: 0,
+    right: 0,
+    width: '40%',
+    height: '100vh',
+    backgroundColor: 'white',
+    boxShadow: '-2px 0 5px rgba(0,0,0,0.1)',
+    transition: 'transform 0.3s ease-in-out',
+    zIndex: 1000,
+    padding: '20px',
+    overflowY: 'auto'
+  },
+  drawerOpen: {
+    transform: 'translateX(0)'
+  },
+  drawerClosed: {
+    transform: 'translateX(100%)'
+  },
+  mainContent: {
+    transition: 'all 0.3s ease-in-out',
+    width: '100%'
+  },
+  mainContentShifted: {
+    width: '55%',
+    marginRight: '40%'
+  },
+  taskDetails: {
+    fontSize: '95%'
+  },
+  closeButton: {
+    position: 'absolute',
+    top: '10px',
+    right: '10px',
+    zIndex: 1
+  },
+  overlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    opacity: 0,
+    visibility: 'hidden',
+    transition: 'all 0.3s ease-in-out',
+    zIndex: 999
+  },
+  overlayVisible: {
+    opacity: 1,
+    visibility: 'visible'
+  },
+  taskDetailsPage: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'white',
+    zIndex: 1100,
+    overflowY: 'auto',
+    padding: '20px'
+  },
+  activityCard: {
+    marginBottom: '1rem',
+    borderLeft: '4px solid #007bff'
+  },
+  subActivityCard: {
+    marginLeft: '2rem',
+    marginBottom: '0.5rem',
+    borderLeft: '4px solid #6c757d'
+  },
+  backButton: {
+    position: 'sticky',
+    top: '10px',
+    zIndex: 1,
+    backgroundColor: 'white',
+    padding: '10px 0'
   }
 };
 
@@ -64,6 +144,34 @@ const ProjectTasks = ({ projectId }) => {
     start_date: '',
     end_date: ''
   });
+
+  // Add edit task related states
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [editTask, setEditTask] = useState({
+    id: null,
+    title: '',
+    description: '',
+    priority: 1,
+    status: 1,
+    start_date: '',
+    end_date: ''
+  });
+
+  // Add delete task related states
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [taskToDelete, setTaskToDelete] = useState(null);
+
+  // Add task details related states
+  const [showTaskDetails, setShowTaskDetails] = useState(false);
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [taskDetailsLoading, setTaskDetailsLoading] = useState(false);
+  const [taskDetailsError, setTaskDetailsError] = useState('');
+
+  const navigate = useNavigate();
 
   // Add status utility functions
   const getStatusLabel = (status) => {
@@ -248,10 +356,111 @@ const ProjectTasks = ({ projectId }) => {
     }));
   };
 
+  const handleEditClick = (task) => {
+    setEditTask({
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      priority: task.priority || 1,
+      status: task.status || 1,
+      start_date: task.start_date ? new Date(task.start_date).toISOString().split('T')[0] : '',
+      end_date: task.end_date ? new Date(task.end_date).toISOString().split('T')[0] : ''
+    });
+    setShowEditModal(true);
+  };
+
+  const handleEditInputChange = (e) => {
+    const { name, value } = e.target;
+    setEditTask(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    setEditLoading(true);
+    setEditError('');
+
+    try {
+      await projectService.updateTask(projectId, editTask.id, editTask);
+      setShowEditModal(false);
+      fetchTasks(); // Refresh task list
+    } catch (err) {
+      setEditError(err.message || 'Failed to update task');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  // Add delete task handlers
+  const handleDeleteClick = (task) => {
+    setTaskToDelete(task);
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!taskToDelete) return;
+
+    setDeleteLoading(true);
+    setDeleteError('');
+
+    try {
+      await projectService.deleteTask(projectId, taskToDelete.id);
+      setShowDeleteModal(false);
+      setTaskToDelete(null);
+      fetchTasks(); // Refresh task list
+    } catch (err) {
+      setDeleteError(err.message || 'Failed to delete task');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  // Add task details handler
+  const handleTaskClick = async (task) => {
+    setTaskDetailsLoading(true);
+    setTaskDetailsError('');
+    setSelectedTask(task);
+    setShowTaskDetails(true);
+
+    try {
+      const response = await projectService.getTaskDetails(projectId, task.id);
+      setSelectedTask(response.data);
+    } catch (err) {
+      setTaskDetailsError(err.message || 'Failed to fetch task details');
+    } finally {
+      setTaskDetailsLoading(false);
+    }
+  };
+
+  // Add close drawer handler
+  const handleCloseDrawer = () => {
+    setShowTaskDetails(false);
+    setSelectedTask(null);
+    setTaskDetailsError('');
+  };
+
+  // Add click-away handler
+  const handleOverlayClick = (e) => {
+    if (e.target === e.currentTarget) {
+      handleCloseDrawer();
+    }
+  };
+
   return (
     <Card>
       <Card.Body>
-        <div className="d-flex justify-content-between align-items-center mb-3">
+        {/* Overlay for click-away */}
+        <div 
+          style={{
+            ...styles.overlay,
+            ...(showTaskDetails ? styles.overlayVisible : {})
+          }}
+          onClick={handleOverlayClick}
+        />
+
+        <div className={`d-flex justify-content-between align-items-center mb-3 ${showTaskDetails ? styles.mainContentShifted : ''}`}>
           <div className="d-flex align-items-center gap-3">
             <InputGroup size="sm" style={{ width: '250px' }}>
               <InputGroup.Text style={styles.controlText}>
@@ -398,7 +607,7 @@ const ProjectTasks = ({ projectId }) => {
         )}
 
         {/* Task List Section */}
-        <div className="mb-3">
+        <div className={`mb-3 ${showTaskDetails ? styles.mainContentShifted : ''}`}>
           {taskError && <Alert variant="danger" className="mb-3" style={styles.smallText}>{taskError}</Alert>}
 
           <Table responsive hover className="align-middle">
@@ -439,7 +648,12 @@ const ProjectTasks = ({ projectId }) => {
                 </tr>
               ) : (
                 tasks.map((task) => (
-                  <tr key={task.id} style={styles.tableText}>
+                  <tr 
+                    key={task.id} 
+                    style={styles.tableText}
+                    onClick={() => handleTaskClick(task)}
+                    className="cursor-pointer"
+                  >
                     <td>{task.task_index}</td>
                     <td>{task.title}</td>
                     <td>
@@ -450,10 +664,26 @@ const ProjectTasks = ({ projectId }) => {
                     <td>{new Date(task.due_date).toLocaleDateString()}</td>
                     <td>{task.assigned_to}</td>
                     <td>
-                      <Button variant="link" size="sm" className="p-0 me-2">
+                      <Button 
+                        variant="link" 
+                        size="sm" 
+                        className="p-0 me-2"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditClick(task);
+                        }}
+                      >
                         <i className="bi bi-pencil"></i>
                       </Button>
-                      <Button variant="link" size="sm" className="p-0 text-danger">
+                      <Button 
+                        variant="link" 
+                        size="sm" 
+                        className="p-0 text-danger"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteClick(task);
+                        }}
+                      >
                         <i className="bi bi-trash"></i>
                       </Button>
                     </td>
@@ -462,6 +692,108 @@ const ProjectTasks = ({ projectId }) => {
               )}
             </tbody>
           </Table>
+        </div>
+
+        {/* Task Details Drawer */}
+        <div 
+          style={{
+            ...styles.drawer,
+            ...(showTaskDetails ? styles.drawerOpen : styles.drawerClosed)
+          }}
+        >
+          <Button
+            variant="link"
+            className="p-0"
+            style={styles.closeButton}
+            onClick={handleCloseDrawer}
+          >
+            <i className="bi bi-x-lg"></i>
+          </Button>
+
+          {taskDetailsLoading ? (
+            <div className="text-center py-5">
+              <Spinner animation="border" role="status">
+                <span className="visually-hidden">Loading...</span>
+              </Spinner>
+            </div>
+          ) : taskDetailsError ? (
+            <Alert variant="danger" style={styles.taskDetails}>
+              {taskDetailsError}
+            </Alert>
+          ) : selectedTask ? (
+            <div style={styles.taskDetails}>
+              <h4 className="mb-4">{selectedTask.title}</h4>
+              
+              <div className="mb-4">
+                <h6 className="text-muted mb-2">Description</h6>
+                <p>{selectedTask.description}</p>
+              </div>
+
+              <Row className="mb-4">
+                <Col md={6}>
+                  <h6 className="text-muted mb-2">Status</h6>
+                  <Badge bg={getStatusVariant(selectedTask.status)}>
+                    {getStatusLabel(selectedTask.status)}
+                  </Badge>
+                </Col>
+                <Col md={6}>
+                  <h6 className="text-muted mb-2">Priority</h6>
+                  <Badge bg={selectedTask.priority === 3 ? 'danger' : selectedTask.priority === 2 ? 'warning' : 'info'}>
+                    {selectedTask.priority === 3 ? 'High' : selectedTask.priority === 2 ? 'Medium' : 'Low'}
+                  </Badge>
+                </Col>
+              </Row>
+
+              <Row className="mb-4">
+                <Col md={6}>
+                  <h6 className="text-muted mb-2">Start Date</h6>
+                  <p>{new Date(selectedTask.start_date).toLocaleDateString()}</p>
+                </Col>
+                <Col md={6}>
+                  <h6 className="text-muted mb-2">Due Date</h6>
+                  <p>{new Date(selectedTask.due_date).toLocaleDateString()}</p>
+                </Col>
+              </Row>
+
+              <div className="mb-4">
+                <h6 className="text-muted mb-2">Assigned To</h6>
+                <p>{selectedTask.assigned_to || 'Unassigned'}</p>
+              </div>
+
+              <div className="d-flex gap-2">
+                <Button
+                  variant="outline-primary"
+                  size="sm"
+                  onClick={() => {
+                    handleCloseDrawer();
+                    handleEditClick(selectedTask);
+                  }}
+                >
+                  <i className="bi bi-pencil me-1"></i>
+                  Edit Task
+                </Button>
+                <Button
+                  variant="outline-danger"
+                  size="sm"
+                  onClick={() => {
+                    handleCloseDrawer();
+                    handleDeleteClick(selectedTask);
+                  }}
+                >
+                  <i className="bi bi-trash me-1"></i>
+                  Delete Task
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => navigate(`/project/${projectId}/task/${selectedTask.id}`)}
+                >
+                  <i className="bi bi-eye me-1"></i>
+                  View Details
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {/* Create Task Modal */}
@@ -599,6 +931,200 @@ const ProjectTasks = ({ projectId }) => {
               </Button>
             </Modal.Footer>
           </Form>
+        </Modal>
+
+        {/* Edit Task Modal */}
+        <Modal show={showEditModal} onHide={() => setShowEditModal(false)} centered>
+          <Modal.Header closeButton>
+            <Modal.Title style={styles.controlText}>Edit Task</Modal.Title>
+          </Modal.Header>
+          <Form onSubmit={handleEditSubmit}>
+            <Modal.Body>
+              {editError && (
+                <Alert variant="danger" className="mb-3" style={styles.controlText}>
+                  {editError}
+                </Alert>
+              )}
+
+              <Form.Group className="mb-3">
+                <Form.Label style={styles.controlText}>Title</Form.Label>
+                <Form.Control
+                  type="text"
+                  name="title"
+                  value={editTask.title}
+                  onChange={handleEditInputChange}
+                  required
+                  style={styles.controlText}
+                  size="sm"
+                />
+              </Form.Group>
+
+              <Form.Group className="mb-3">
+                <Form.Label style={styles.controlText}>Description</Form.Label>
+                <Form.Control
+                  as="textarea"
+                  rows={3}
+                  name="description"
+                  value={editTask.description}
+                  onChange={handleEditInputChange}
+                  required
+                  style={styles.controlText}
+                  size="sm"
+                />
+              </Form.Group>
+
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label style={styles.controlText}>Priority</Form.Label>
+                    <Form.Select
+                      name="priority"
+                      value={editTask.priority}
+                      onChange={handleEditInputChange}
+                      style={styles.controlText}
+                      size="sm"
+                    >
+                      <option value="1">Low</option>
+                      <option value="2">Medium</option>
+                      <option value="3">High</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label style={styles.controlText}>Status</Form.Label>
+                    <Form.Select
+                      name="status"
+                      value={editTask.status}
+                      onChange={handleEditInputChange}
+                      style={styles.controlText}
+                      size="sm"
+                    >
+                      <option value="1">Active</option>
+                      <option value="2">Completed</option>
+                      <option value="3">On Hold</option>
+                      <option value="4">Cancelled</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+              </Row>
+
+              <Row>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label style={styles.controlText}>Start Date</Form.Label>
+                    <Form.Control
+                      type="date"
+                      name="start_date"
+                      value={editTask.start_date}
+                      onChange={handleEditInputChange}
+                      required
+                      style={styles.controlText}
+                      size="sm"
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label style={styles.controlText}>End Date</Form.Label>
+                    <Form.Control
+                      type="date"
+                      name="end_date"
+                      value={editTask.end_date}
+                      onChange={handleEditInputChange}
+                      required
+                      style={styles.controlText}
+                      size="sm"
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button
+                variant="secondary"
+                onClick={() => setShowEditModal(false)}
+                size="sm"
+                style={styles.controlText}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                type="submit"
+                disabled={editLoading}
+                size="sm"
+                style={styles.controlText}
+              >
+                {editLoading ? (
+                  <>
+                    <Spinner
+                      as="span"
+                      animation="border"
+                      size="sm"
+                      role="status"
+                      aria-hidden="true"
+                      className="me-2"
+                    />
+                    Updating...
+                  </>
+                ) : (
+                  'Update Task'
+                )}
+              </Button>
+            </Modal.Footer>
+          </Form>
+        </Modal>
+
+        {/* Delete Task Confirmation Modal */}
+        <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
+          <Modal.Header closeButton>
+            <Modal.Title style={styles.controlText}>Delete Task</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            {deleteError && (
+              <Alert variant="danger" className="mb-3" style={styles.controlText}>
+                {deleteError}
+              </Alert>
+            )}
+            <p style={styles.controlText}>
+              Are you sure you want to delete the task "{taskToDelete?.title}"? This action cannot be undone.
+            </p>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button
+              variant="secondary"
+              onClick={() => setShowDeleteModal(false)}
+              size="sm"
+              style={styles.controlText}
+              disabled={deleteLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleDeleteConfirm}
+              disabled={deleteLoading}
+              size="sm"
+              style={styles.controlText}
+            >
+              {deleteLoading ? (
+                <>
+                  <Spinner
+                    as="span"
+                    animation="border"
+                    size="sm"
+                    role="status"
+                    aria-hidden="true"
+                    className="me-2"
+                  />
+                  Deleting...
+                </>
+              ) : (
+                'Delete Task'
+              )}
+            </Button>
+          </Modal.Footer>
         </Modal>
       </Card.Body>
     </Card>

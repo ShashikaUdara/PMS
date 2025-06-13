@@ -10,6 +10,7 @@ import Project from './pages/Project';
 import ProjectStages from './pages/ProjectStages';
 import StageActivities from './pages/StageActivities';
 import SubActivities from './pages/SubActivities';
+import ProjectTaskDetails from './pages/ProjectTaskDetails';
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/projects" element={<Projects />} />
           <Route path="/project/:projectId" element={<Project />} />
+          <Route path="/project/:projectId/task/:taskId" element={<ProjectTaskDetails />} />
           <Route path="/project-stages" element={<ProjectStages />} />
           <Route path="/stage-activities/:stageId" element={<StageActivities />} />
           <Route path="/sub-activities/:activityId" element={<SubActivities />} />

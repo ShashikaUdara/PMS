@@ -214,7 +214,7 @@ class ProjectTask(Base):
         Index('idx_project_task_status', 'status'),
         Index('idx_project_task_assigned_to', 'assigned_to'),
         Index('idx_project_task_due_date', 'due_date'),
-        UniqueConstraint('task_index', name='uq_task_index'),
+        # UniqueConstraint('task_index', name='uq_task_index'),
         {'schema': SCHEMA_NAME},
     )
 

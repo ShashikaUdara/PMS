@@ -9,3 +9,6 @@ run:
 
 tail:
 	docker-compose logs -f
+
+drop:
+	docker-compose down -v
